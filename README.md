@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 | Supported Targets | ESP32-P4 | ESP32-S2 | ESP32-S3 |
 | ----------------- | -------- | -------- | -------- |
 
@@ -78,3 +79,7 @@ I (480) example: USB initialization DONE
 I (2490) example: Sending Keyboard report
 I (3040) example: Sending Mouse report
 ```
+=======
+# ifpd-touch-back
+To enable reverse touch / touch back feature in only IA based IFPD
+>>>>>>> 78bb8bcdb5cf74bd2fd33a837cd97e19926f4815
