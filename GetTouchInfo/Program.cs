@@ -20,12 +20,82 @@ namespace TouchDataCaptureService
 
         // ===================== SERIAL CONFIGURATION =====================
         // Make these configurable - can be overridden by config file or command line
-        private static string SerialPortName = "COM7"; // Default value
+        private static string SerialPortName = "COM8"; // Default value
         private static int SerialBaudRate = 921600; // Changed to 921600
         private static SerialPort? _serialPort;
         private static Thread? _serialReaderThread;
         private static volatile bool _serialThreadRunning = false;
         private static bool SendRawDataSerial = false;
+
+        // ===================== DYNAMIC COORDINATE SCALING =====================
+        private static class CoordinateScaler
+        {
+            private static int _minX = 0;
+            private static int _maxX = 30735;
+            private static int _minY = 0;
+            private static int _maxY = 17295;
+            private static int _samplesCount = 0;
+            private static readonly int MinSamplesForScaling = 10;
+            private static readonly object _scalingLock = new object();
+
+            public static (int scaledX, int scaledY) ScaleCoordinates(int rawX, int rawY)
+            {
+                lock (_scalingLock)
+                {
+                    // Update coordinate bounds
+                    _minX = Math.Min(_minX, rawX);
+                    _maxX = Math.Max(_maxX, rawX);
+                    _minY = Math.Min(_minY, rawY);
+                    _maxY = Math.Max(_maxY, rawY);
+                    _samplesCount++;
+
+                    // Need minimum samples to establish reliable scaling
+                    if (_samplesCount < MinSamplesForScaling)
+                    {
+                        // Return raw coordinates until we have enough samples
+                        return (Math.Clamp(rawX, 0, 32767), Math.Clamp(rawY, 0, 32767));
+                    }
+
+                    // Calculate scaling factors
+                    int rangeX = _maxX - _minX;
+                    int rangeY = _maxY - _minY;
+
+                    // Avoid division by zero
+                    if (rangeX <= 0 || rangeY <= 0)
+                    {
+                        return (Math.Clamp(rawX, 0, 32767), Math.Clamp(rawY, 0, 32767));
+                    }
+
+                    // Normalize to 0-32767 range
+                    int scaledX = (int)((double)(rawX - _minX) * 32767.0 / rangeX);
+                    int scaledY = (int)((double)(rawY - _minY) * 32767.0 / rangeY);
+
+                    // Clamp to valid HID range
+                    scaledX = Math.Clamp(scaledX, 0, 32767);
+                    scaledY = Math.Clamp(scaledY, 0, 32767);
+
+                    if (_samplesCount % 50 == 0) // Log scaling info periodically
+                    {
+                        Console.WriteLine($"[SCALING] Range: X({_minX}-{_maxX}={rangeX}) Y({_minY}-{_maxY}={rangeY}) | Raw({rawX},{rawY}) -> Scaled({scaledX},{scaledY})");
+                    }
+
+                    return (scaledX, scaledY);
+                }
+            }
+
+            public static void ResetScaling()
+            {
+                lock (_scalingLock)
+                {
+                    _minX = int.MaxValue;
+                    _maxX = int.MinValue;
+                    _minY = int.MaxValue;
+                    _maxY = int.MinValue;
+                    _samplesCount = 0;
+                    Console.WriteLine("[SCALING] Coordinate scaling reset");
+                }
+            }
+        }
 
         // ===================== CONSTANTS =====================
         private const int WM_INPUT = 0x00FF;
@@ -318,6 +388,11 @@ namespace TouchDataCaptureService
             Console.WriteLine(" --useraw Sends Raw data via serial. By default decoded data is being sent serially");
             Console.WriteLine("  -h, --help       Show this help message");
             Console.WriteLine();
+            Console.WriteLine("Features:");
+            Console.WriteLine("  • Dynamic coordinate scaling: Automatically normalizes touch coordinates");
+            Console.WriteLine("  • Press 'R' key to reset coordinate scaling and recalibrate");
+            Console.WriteLine("  • Touch all corners of the screen to establish coordinate range");
+            Console.WriteLine();
             Console.WriteLine("Configuration:");
             Console.WriteLine("  Baud rate: 921600 (default)");
             Console.WriteLine();
@@ -395,6 +470,10 @@ namespace TouchDataCaptureService
             Debug.WriteLine($"Detailed Log: {DetailedLogFile}");
             Debug.WriteLine($"Serial Log: {SerialLogFile}");
             Debug.WriteLine($"Serial Port: {SerialPortName} @ {SerialBaudRate} baud");
+            Debug.WriteLine("\n=== DYNAMIC COORDINATE SCALING ACTIVE ===");
+            Debug.WriteLine("• Touch all corners of your screen to calibrate coordinate scaling");
+            Debug.WriteLine("• Coordinates will be automatically normalized to work across all systems");
+            Debug.WriteLine("• Press 'R' key anytime to reset scaling and recalibrate");
             Debug.WriteLine("Touch the screen to see logs...\n");
 
             // Start serial reader thread
@@ -419,8 +498,8 @@ namespace TouchDataCaptureService
                     ReadTimeout = 1000,
                     WriteTimeout = 1000,
                     Handshake = Handshake.None,
-                    DtrEnable = false,   
-                    RtsEnable = false  
+                    DtrEnable = false,
+                    RtsEnable = false
                 };
 
                 _serialPort.Open();
@@ -546,10 +625,8 @@ namespace TouchDataCaptureService
             {
                 try
                 {
-                    // touchData.X and touchData.Y are already in HID logical coordinates (0-32767)
-                    // Send them directly - resolution independent!
-                    int hidX = Math.Clamp(touchData.X, 0, 32767);
-                    int hidY = Math.Clamp(touchData.Y, 0, 32767);
+                    // Apply dynamic coordinate scaling to normalize coordinates to HID range (0-32767)
+                    var (hidX, hidY) = CoordinateScaler.ScaleCoordinates(touchData.X, touchData.Y);
 
                     // Send all decoded fields
                     // Format: TOUCH,x,y,cid,tip,pressure,inrange,confidence,width,height,azimuth,altitude,twist,contactcount
@@ -756,11 +833,24 @@ namespace TouchDataCaptureService
         }
 
         // ===================== WINDOW PROC =====================
+        private const uint WM_KEYDOWN = 0x0100;
+
         private static IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
             if (msg == WM_INPUT)
             {
                 HandleRawInput(lParam);
+                return IntPtr.Zero;
+            }
+            else if (msg == WM_KEYDOWN)
+            {
+                // Handle keyboard input for commands
+                int keyCode = wParam.ToInt32();
+                if (keyCode == 'R' || keyCode == 'r') // Reset coordinate scaling
+                {
+                    CoordinateScaler.ResetScaling();
+                    Console.WriteLine("Coordinate scaling reset! Touch all corners again to recalibrate.");
+                }
                 return IntPtr.Zero;
             }
 
@@ -829,7 +919,7 @@ namespace TouchDataCaptureService
                             LogDetailed(decoded);
 
                             // Send touch data via serial
-                            if(!SendRawDataSerial)
+                            if (!SendRawDataSerial)
                                 SendTouchDataViaSerial(decoded);
                         }
                         else
@@ -1034,12 +1124,12 @@ namespace TouchDataCaptureService
                 summaryParts.Add($"CID:{result.ContactId}");
                 summaryParts.Add($"TIP:{(result.TipSwitch ? 1 : 0)}");
 
-                if(result.InRange) 
+                if (result.InRange)
                     summaryParts.Add("RNG:1");
                 else
                     summaryParts.Add("RNG:0");
 
-                if (result.Confidence) 
+                if (result.Confidence)
                     summaryParts.Add("CONF:1");
                 else
                     summaryParts.Add("CONF:0");
