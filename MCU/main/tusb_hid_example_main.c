@@ -55,15 +55,15 @@ void parse_touch(char *line)
         if (x > HID_MAX) x = HID_MAX;
         if (y > HID_MAX) y = HID_MAX;
 
-        ESP_LOGI(TAG, "Touch: hid=(%d,%d) cid=%d tip=%d press=%d",
-                 x, y, cid, tip, pressure);
+        // ESP_LOGI(TAG, "Touch: hid=(%d,%d) cid=%d tip=%d press=%d",
+        //           x, y, cid, tip, pressure);
 
         hid_touch_send(x, y, cid, tip, pressure);
     }
-    else
-    {
-        ESP_LOGW(TAG, "Parse failed: [%s]", line);
-    }
+    // else
+    // {
+    //     ESP_LOGW(TAG, "Parse failed: [%s]", line);
+    // }
 }
 
 static QueueHandle_t line_queue;
@@ -103,14 +103,22 @@ static void uart_rx_task(void *arg)
 }
 
 // Task 2: Dequeue lines and send USB HID touch reports
+// Drains all pending messages before blocking again
 static void usb_hid_task(void *arg)
 {
     char line[BUF_SIZE];
 
     for (;;)
     {
+        // Block until at least one message arrives
         if (xQueueReceive(line_queue, line, portMAX_DELAY) == pdTRUE)
+        {
             parse_touch(line);
+
+            // Drain any remaining messages without blocking
+            while (xQueueReceive(line_queue, line, 0) == pdTRUE)
+                parse_touch(line);
+        }
     }
 }
 
@@ -127,10 +135,11 @@ void app_main(void)
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    ESP_LOGI(TAG, "Ready. Waiting for TOUCH commands on UART...");
-
+    // Create queue BEFORE tasks so it is ready when tasks start
     line_queue = xQueueCreate(16, BUF_SIZE);
     configASSERT(line_queue);
+
+    ESP_LOGI(TAG, "Ready. Waiting for TOUCH commands on UART...");
 
     xTaskCreate(uart_rx_task, "uart_rx",  4096, NULL, 6, NULL);
     xTaskCreate(usb_hid_task, "usb_hid", 4096, NULL, 5, NULL);
