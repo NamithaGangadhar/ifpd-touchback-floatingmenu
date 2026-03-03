@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.IO.Ports;
-using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -22,7 +21,7 @@ namespace TouchDataCaptureService
         // ===================== SERIAL CONFIGURATION =====================
         // Make these configurable - can be overridden by config file or command line
         private static string SerialPortName = "COM8"; // Default value
-        private static int SerialBaudRate = 921600; // Changed to 921600
+        private static int SerialBaudRate = 2000000; // Changed to 2mbps
         private static SerialPort? _serialPort;
         private static Thread? _serialReaderThread;
         private static volatile bool _serialThreadRunning = false;
