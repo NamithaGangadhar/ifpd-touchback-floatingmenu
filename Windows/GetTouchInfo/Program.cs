@@ -43,10 +43,30 @@ namespace TouchDataCaptureService
                 lock (_scalingLock)
                 {
                     var logicalRanges = GetHidLogicalRanges(hDevice);
-                    _minX = logicalRanges["X"].min;
-                    _maxX = logicalRanges["X"].max;
-                    _minY = logicalRanges["Y"].min;
-                    _maxY = logicalRanges["Y"].max;
+                    // Safely get logical ranges with defaults
+                    if (logicalRanges.TryGetValue("X", out var xRange))
+                    {
+                        _minX = xRange.min;
+                        _maxX = xRange.max;
+                    }
+                    else
+                    {
+                        // Use defaults if not available
+                        _minX = 0;
+                        _maxX = 32767;
+                    }
+
+                    if (logicalRanges.TryGetValue("Y", out var yRange))
+                    {
+                        _minY = yRange.min;
+                        _maxY = yRange.max;
+                    }
+                    else
+                    {
+                        // Use defaults if not available
+                        _minY = 0;
+                        _maxY = 32767;
+                    }
 
                     // Update coordinate bounds
                     _minX = Math.Min(_minX, rawX);
@@ -82,7 +102,7 @@ namespace TouchDataCaptureService
 
                     if (_samplesCount % 50 == 0) // Log scaling info periodically
                     {
-                        Console.WriteLine($"[SCALING] Range: X({_minX}-{_maxX}={rangeX}) Y({_minY}-{_maxY}={rangeY}) | Raw({rawX},{rawY}) -> Scaled({scaledX},{scaledY})");
+                        Debug.WriteLine($"[SCALING] Range: X({_minX}-{_maxX}={rangeX}) Y({_minY}-{_maxY}={rangeY}) | Raw({rawX},{rawY}) -> Scaled({scaledX},{scaledY})");
                     }
 
                     return (scaledX, scaledY);
@@ -98,7 +118,7 @@ namespace TouchDataCaptureService
                     _minY = int.MaxValue;
                     _maxY = int.MinValue;
                     _samplesCount = 0;
-                    Console.WriteLine("[SCALING] Coordinate scaling reset");
+                    Debug.WriteLine("[SCALING] Coordinate scaling reset");
                 }
             }
         }
@@ -723,7 +743,7 @@ namespace TouchDataCaptureService
                         touchData.ContactCount          // 12: Contact Count
                     );
 
-                    Console.WriteLine($"TX → {message}");
+                    Debug.WriteLine($"TX → {message}");
                     SendSerialData(message);
                 }
                 catch (Exception ex)
@@ -1459,7 +1479,7 @@ namespace TouchDataCaptureService
 
             if (!devicePreparsedData.ContainsKey(hDevice))
             {
-                Console.WriteLine("No preparsed data available for device");
+                Debug.WriteLine("No preparsed data available for device");
                 return result;
             }
 
@@ -1470,11 +1490,11 @@ namespace TouchDataCaptureService
                 // Get device capabilities
                 if (HidP_GetCaps(preparsedData, out HIDP_CAPS caps) != HIDP_STATUS_SUCCESS)
                 {
-                    Console.WriteLine("Failed to get HID capabilities");
+                    Debug.WriteLine("Failed to get HID capabilities");
                     return result;
                 }
 
-                Console.WriteLine($"Device has {caps.NumberInputValueCaps} input value capabilities");
+                Debug.WriteLine($"Device has {caps.NumberInputValueCaps} input value capabilities");
 
                 // Get input value capabilities
                 if (caps.NumberInputValueCaps > 0)
@@ -1490,14 +1510,14 @@ namespace TouchDataCaptureService
                             string propertyName = GetPropertyName(cap.UsagePage, cap.UsageMin);
                             result[propertyName] = (cap.LogicalMin, cap.LogicalMax);
 
-                            Console.WriteLine($"HID Property: {propertyName} = {cap.LogicalMin} to {cap.LogicalMax}");
+                            Debug.WriteLine($"HID Property: {propertyName} = {cap.LogicalMin} to {cap.LogicalMax}");
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting HID logical ranges: {ex.Message}");
+                Debug.WriteLine($"Error getting HID logical ranges: {ex.Message}");
             }
 
             return result;
