@@ -2,6 +2,7 @@
 using System.IO.Ports;
 using System.Runtime.InteropServices;
 using System.Text;
+using TouchDataCaptureService.Helpers;
 
 namespace TouchDataCaptureService
 {
@@ -326,6 +327,12 @@ namespace TouchDataCaptureService
             public IntPtr DeviceHandle { get; set; }
             public byte ReportId { get; set; }
             public uint ContactCount { get; set; }
+
+            //Process related info
+            public string ProcessName { get; set; } = "";
+            public uint ProcessId { get; set; }
+            public IntPtr WindowHandle { get; set; }
+            public string WindowTitle { get; set; } = "";
         }
 
         // ===================== WIN32 API =====================
@@ -432,6 +439,8 @@ namespace TouchDataCaptureService
         private static bool _decodedHeaderWritten = false;
         private static bool _detailedHeaderWritten = false;
         private static bool _serialHeaderWritten = false;
+
+        private static string SkipProcessName = "notepad++";
 
         private static void ProcessCommandLineArgs(string[] args)
         {
@@ -1008,7 +1017,7 @@ namespace TouchDataCaptureService
                     for (ushort i = 1; i <= contactCount; i++)
                     {
                         var decoded = DecodeHIDReport(header.hDevice, dataPtr, (uint)bytes, i);
-                        if (decoded.IsValid)
+                        if (decoded.IsValid && !decoded.ProcessName.Equals(SkipProcessName))
                         {
                             var decodedLogString = (i != contactCount) ? $"[HID] {decoded.Summary}" : $"[HID] {decoded.Summary}\n";
                             LogDecoded(decodedLogString);
@@ -1135,6 +1144,16 @@ namespace TouchDataCaptureService
                     HID_USAGE_GENERIC_Y, out uint y, preparsedData, reportData, reportSize) == HIDP_STATUS_SUCCESS)
                 {
                     result.Y = (int)y;
+                }
+
+                //Get Foreground Window Process info 
+                if (result.X > 0 && result.Y > 0)
+                {
+                    var WindowProcessData = WindowProcess.GetProcessAtPoint(result.X, result.Y);
+                    result.ProcessName = WindowProcessData.ProcessName;
+                    result.ProcessId = WindowProcessData.ProcessId;
+                    result.WindowHandle = WindowProcessData.WindowHandle;
+                    result.WindowTitle = WindowProcessData.WindowTitle;
                 }
 
                 // Get Contact ID
@@ -1438,7 +1457,10 @@ namespace TouchDataCaptureService
                 $"ContactID: {data.ContactId}",
                 $"TipSwitch: {data.TipSwitch}",
                 $"InRange: {data.InRange}",
-                $"Confidence: {data.Confidence}"
+                $"Confidence: {data.Confidence}",
+                $"ProcessName: {data.ProcessName}",
+                $"ProcessID: {data.ProcessId}",
+                $"WindowTitle: {data.WindowTitle}"
             };
 
             if (data.Pressure > 0) details.Add($"Pressure: {data.Pressure}");
