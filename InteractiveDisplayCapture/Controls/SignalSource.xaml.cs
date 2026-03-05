@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Animation;
 using ListBox = System.Windows.Controls.ListBox;
 using MessageBox = System.Windows.MessageBox;
 
@@ -32,6 +33,7 @@ namespace InteractiveDisplayCapture.Controls
         private Task _cameraTask;
         private CameraWindow _cameraWindow;
         public event Action<int> DeviceSelected;
+        private SignalSourceModel device;
         public SignalSourceModel SelectedDevice
         {
             get => _selectedDevice;
@@ -94,7 +96,7 @@ namespace InteractiveDisplayCapture.Controls
                 new SignalSourceModel { Name = "PC1", Status = DeviceStatusEnum.Disconnected },
                 new SignalSourceModel { Name = "PC2", Status = DeviceStatusEnum.Available }
             };
-
+            device = new SignalSourceModel();
             this.Unloaded += (s, e) => StopCamera();
 
            // this.Unloaded += SignalSource_Unloaded;
@@ -344,7 +346,7 @@ namespace InteractiveDisplayCapture.Controls
                 }
 
                 device.Status = DeviceStatusEnum.Connected;
-
+                
                 DeviceSelected?.Invoke(0); // Open camera
             }
             else if (device.Status == DeviceStatusEnum.Connected)
@@ -353,6 +355,20 @@ namespace InteractiveDisplayCapture.Controls
 
                 DeviceSelected?.Invoke(-1); // Close camera
             }
+            //UpdateDevice(device);
+        }
+
+        public string UpdateDevice()
+        {
+            if (device.Status == DeviceStatusEnum.Connected)
+            {
+                return device.Name;
+            }
+            else if (device.Status != DeviceStatusEnum.Connected)
+            {
+                return string.Empty;
+            }
+            return string.Empty;
         }
     }
 }

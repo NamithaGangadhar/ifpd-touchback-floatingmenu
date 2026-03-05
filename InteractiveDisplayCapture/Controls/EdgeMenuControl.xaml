@@ -15,7 +15,8 @@
                       ShadowDepth="2"
                       Opacity="0.4"/>
             </Border.Effect>
-            
+
+            <Grid>
             <ListBox x:Name="NavList"
                      Width="auto"
                      Height="auto"
@@ -79,6 +80,17 @@
                 </ListBoxItem>
 
             </ListBox>
+          
+            <TextBlock Margin="0,65,0,0" 
+                       x:Name="PCStatus"
+                       Height="20" 
+                       Foreground="White"
+                       Background="Transparent" 
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center">
+                
+            </TextBlock>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

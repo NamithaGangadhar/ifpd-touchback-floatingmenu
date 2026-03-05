@@ -4,6 +4,7 @@ using InteractiveDisplayCapture.Services;
 using InteractiveDisplayCapture.ViewModels;
 using System.Configuration;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -18,6 +19,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using MessageBox = System.Windows.MessageBox;
+
 
 namespace InteractiveDisplayCapture
 {
@@ -37,8 +39,13 @@ namespace InteractiveDisplayCapture
         private bool _menuOpen = false;
         private bool _flyoutOpen = false;
         private CameraWindow _cameraWindow;
+        private Process _annotationProcess;
 
         private SignalSource _signalSourcePage;
+
+        private bool _isAnnotationRunning = false;
+        private bool _isCameraRunning = false;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -70,7 +77,7 @@ namespace InteractiveDisplayCapture
                            (screen.WorkingArea.Height - this.Height) / 2;
 
                 EdgeMenu.Visibility = Visibility.Visible;
-
+                
                 _menuOpen = true;
                 EdgeHandle.Visibility = Visibility.Collapsed;
             }
@@ -86,10 +93,15 @@ namespace InteractiveDisplayCapture
                            (screen.WorkingArea.Height - this.Height) / 2;
 
                 EdgeMenu.Visibility = Visibility.Collapsed;
-
+               
                 _menuOpen = false;
 
                 EdgeHandle.Visibility = Visibility.Visible;
+            }
+            if(_cameraWindow != null)
+            {
+                FlyoutContainer.Visibility = Visibility.Visible;
+                EdgeMenu.SelectMenuItem(2);
             }
         }
 
@@ -99,7 +111,7 @@ namespace InteractiveDisplayCapture
             switch (index)
             {
                 case 0:
-                    CollapseMenu();
+                    CollapseMenu(true);
                     break;
 
                 case 1:
@@ -121,7 +133,7 @@ namespace InteractiveDisplayCapture
                     break;
 
                 case 3:
-                    LaunchAnnotationApp();
+                    LaunchAnnotationAppAsync();
                     break;
 
                 case 4:
@@ -140,10 +152,11 @@ namespace InteractiveDisplayCapture
             {
                 _cameraWindow.Close();
                 _cameraWindow = null;
+                EdgeMenu.PCStatus.Text = _signalSourcePage.UpdateDevice();
             }
         }
 
-        private void CollapseMenu()
+        private void CollapseMenu(bool clearSelection = true)
         {
             var screen = System.Windows.Forms.Screen.FromHandle(
         new WindowInteropHelper(this).Handle);
@@ -158,11 +171,16 @@ namespace InteractiveDisplayCapture
 
             EdgeMenu.Visibility = Visibility.Collapsed;
             EdgeHandle.Visibility = Visibility.Visible;
-            FlyoutContainer.Visibility = Visibility.Collapsed;
             _menuOpen = false;
+            FlyoutContainer.Visibility = Visibility.Collapsed;
+            if (_cameraWindow == null)
+            {
+                if (clearSelection)
+                    EdgeMenu.ClearSelection();
 
-            // ?? Clear selected icon
-            EdgeMenu.ClearSelection();
+                
+
+            }
         }
 
         private void ShowSignalSourceFlyout()
@@ -173,12 +191,9 @@ namespace InteractiveDisplayCapture
                 _signalSourcePage = new SignalSource();
                 _signalSourcePage.DeviceSelected += OpenCameraWindow;
             }
-            if(_cameraWindow == null)
-            {
-
-            }
+        
             ShowFlyout(_signalSourcePage);
-           
+            EdgeMenu.PCStatus.Text = _signalSourcePage.UpdateDevice();
         }
 
         private void ShowFlyout(Page page)
@@ -228,10 +243,10 @@ namespace InteractiveDisplayCapture
             _cameraWindow.CameraClosed += OnCameraClosed;
 
             _cameraWindow.Show();
-
-            // minimize menu when camera opens
+            _isCameraRunning = true;
+           
             CollapseMenu();
-
+          
             //if (_cameraWindow == null)
             //{
             //    _cameraWindow = new CameraWindow(index);
@@ -283,9 +298,11 @@ namespace InteractiveDisplayCapture
             {
                 _cameraWindow = null;
                 _cameraClosedManually = true;
+                _isCameraRunning = false;
                 _menuOpen = false;
                 ToggleMenu();
-
+                EdgeMenu.ClearSelection();
+                EdgeMenu.SelectMenuItem(2);
                 if (_cameraClosedManually)
                 {
                     _signalSourcePage = new SignalSource();
@@ -294,6 +311,7 @@ namespace InteractiveDisplayCapture
                 }
 
                 ShowFlyout(_signalSourcePage);
+                EdgeMenu.PCStatus.Text = _signalSourcePage.UpdateDevice();
             });
         }
 
@@ -302,24 +320,27 @@ namespace InteractiveDisplayCapture
             _signalSourcePage?.StopCamera();
         }
 
-        private void LaunchAnnotationApp()
+        private async Task LaunchAnnotationAppAsync()
         {
             try
             {
-
+                //if (_annotationProcess != null && !_annotationProcess.HasExited)
+                //    return; // Already running
                 string exePath = @"C:\Program Files\WindowsApps\19566Hanakiansoftware.ScreenPaint_1.3.3.0_x64__y1w6xw98tx1ba\DesktopDrawing\ScreenPaint.exe";
+                //string exePath = System.IO.Path.Combine(
+                //    AppDomain.CurrentDomain.BaseDirectory,
+                //    "ppInk",
+                //    "ppInk.exe");
 
-                Process process = new Process();
-                process.StartInfo.FileName = exePath;
-                process.StartInfo.UseShellExecute = true;
-                process.EnableRaisingEvents = true;
+                _annotationProcess = new Process();
+                _annotationProcess.StartInfo.FileName = exePath;
+                _annotationProcess.EnableRaisingEvents = true;
+                _annotationProcess.Exited += AnnotationProcess_Exited;
 
-                process.Exited += AnnotationApp_Exited;
+                _annotationProcess.Start();
 
-                process.Start();
-
-                // Hide your dock
-                CollapseMenu();   // or this.Hide();
+                _isAnnotationRunning = true;
+                CollapseMenu(false);
             }
             catch (Exception ex)
             {
@@ -327,17 +348,125 @@ namespace InteractiveDisplayCapture
             }
         }
 
-        private void AnnotationApp_Exited(object? sender, EventArgs e)
+        private void AnnotationApp_Exited(object sender, EventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _isAnnotationRunning = false;
+                EdgeMenu.ClearSelection();
+                _annotationProcess.Dispose();
+                _annotationProcess = null;
+            });
+        }
+
+        private async Task LaunchAnnotationAppAsync1()
+        {
+            try
+            {
+               // EdgeMenu.SelectMenuItem(3);
+
+                string exePath = System.IO.Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    "ppInk",
+                    "ppInk.exe");
+
+                Process.Start(exePath);
+
+                CollapseMenu(false); 
+                await MonitorAnnotationApp();
+
+                ////string exePath = @"C:\Program Files\WindowsApps\19566Hanakiansoftware.ScreenPaint_1.3.3.0_x64__y1w6xw98tx1ba\DesktopDrawing\ScreenPaint.exe";
+                //Process.Start(exePath);
+
+                //CollapseMenu(false); // keep selection
+
+                //// Wait until real ppInk process appears
+                //await WaitForAnnotationToClose();
+
+
+                //Process process = new Process();
+                //process.StartInfo.FileName = exePath;
+                //process.StartInfo.UseShellExecute = true;
+                //process.EnableRaisingEvents = true;
+
+                //process.Exited += AnnotationApp_Exited;
+
+                //process.Start();
+
+                //// Hide your dock
+                //CollapseMenu(false);   // or this.Hide();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to launch application:\n" + ex.Message);
+            }
+        }
+
+        private async Task MonitorAnnotationApp()
+        {
+            await Task.Run(() =>
+            {
+                while (Process.GetProcessesByName("ppInk").Length == 0)
+                    Thread.Sleep(300);
+               // _isAnnotationRunning = true;
+
+                while (Process.GetProcessesByName("ppInk").Length > 0)
+                    Thread.Sleep(500);
+            });
+
+            // Back to UI thread
+            Dispatcher.Invoke(() =>
+            {
+              //  _isAnnotationRunning = false;
+                EdgeMenu.ClearSelection();
+            });
+        }
+
+        private async Task WaitForAnnotationToClose()
+        {
+            await Task.Run(() =>
+            {
+                Process annotationProcess = null;
+
+                // Wait until process starts
+                while (annotationProcess == null)
+                {
+                    var processes = Process.GetProcessesByName("ppInk");
+                    if (processes.Length > 0)
+                        annotationProcess = processes[0];
+
+                    Thread.Sleep(300);
+                }
+
+                // Wait until it exits
+                annotationProcess.WaitForExit();
+            });
+
+            // Back to UI thread
+            Dispatcher.Invoke(() =>
+            {
+                EdgeMenu.ClearSelection();
+
+                if (!_menuOpen)
+                    ToggleMenu();
+            });
+        }
+
+        private void AnnotationProcess_Exited(object? sender, EventArgs e)
         {
             // Must switch back to UI thread
             Dispatcher.Invoke(() =>
             {
-                // Open the menu
-                if (!_menuOpen)
-                    ToggleMenu();
+                _annotationProcess = null;
+                EdgeMenu.ClearSelection();
 
-                // Select Annotation item (example index 3)
-               // EdgeMenu.SelectMenuItem(3);
+                // EdgeMenu.ClearSelection();
+                // // Open the menu
+                // if (!_menuOpen)
+                //     ToggleMenu();
+
+                // // Select Annotation item (example index 3)
+                //// EdgeMenu.SelectMenuItem(3);
             });
         }
 

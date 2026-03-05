@@ -10,12 +10,38 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="ppInk\Cyotek.Windows.Forms.ColorPicker.dll" />
+    <None Remove="ppInk\Microsoft.Ink.dll" />
+    <None Remove="ppInk\ppInk.exe" />
+    <None Remove="ppInk\ppInk.exe.config" />
+    <None Remove="ppInk\ppInk.pdb" />
+  </ItemGroup>
+
+  <ItemGroup>
     <COMReference Include="{215d64d2-031c-33c7-96e3-61794cd1ee61}">
       <WrapperTool>tlbimp</WrapperTool>
       <VersionMinor>4</VersionMinor>
       <VersionMajor>2</VersionMajor>
       <Guid>215d64d2-031c-33c7-96e3-61794cd1ee61</Guid>
     </COMReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="ppInk\Cyotek.Windows.Forms.ColorPicker.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ppInk\Microsoft.Ink.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ppInk\ppInk.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ppInk\ppInk.exe.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ppInk\ppInk.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
