@@ -37,7 +37,32 @@ namespace TouchDataCaptureService.Helpers
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+
+        private const int SM_CXSCREEN = 0;  // Screen width
+        private const int SM_CYSCREEN = 1;  // Screen height
+
         private static WindowProcessInfo currentWindowProcessInfo = new WindowProcessInfo("Unknown", 0, IntPtr.Zero, "Unknown");
+
+        // Convert HID logical coordinates to screen pixel coordinates
+        public static (int screenX, int screenY) ConvertHidToScreenCoordinates(
+            int hidX, int hidY,
+            int logicalMinX, int logicalMaxX,
+            int logicalMinY, int logicalMaxY)
+        {
+            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+            // Map HID range to screen range
+            double normalizedX = (double)(hidX - logicalMinX) / (logicalMaxX - logicalMinX);
+            double normalizedY = (double)(hidY - logicalMinY) / (logicalMaxY - logicalMinY);
+
+            int screenX = (int)(normalizedX * screenWidth);
+            int screenY = (int)(normalizedY * screenHeight);
+
+            return (screenX, screenY);
+        }
 
         public static WindowProcessInfo GetProcessAtPoint(int x, int y, bool getWindowTitle = false)
         {
@@ -56,51 +81,51 @@ namespace TouchDataCaptureService.Helpers
                 {
                     // Get process ID
                     GetWindowThreadProcessId(windowHandle, out uint processId);
-                    if(processId != currentWindowProcessInfo.ProcessId)
+                    if (processId != currentWindowProcessInfo.ProcessId)
                     {
                         Debug.WriteLine($"New process detected: {processId}");
                         currentWindowProcessInfo.ProcessId = processId;
 
-                        string processName = "Unknown";
+                    string processName = "Unknown";
 
-                        try
-                        {
-                            using (Process process = Process.GetProcessById((int)processId))
-                            {
-                                processName = process.ProcessName;
-                            }
-                        }
-                        catch (ArgumentException)
-                        {
-                            // Process might have exited
-                            processName = "Exited";
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"Error getting process info: {ex.Message}");
-                            processName = "AccessDenied";
-                        }
-
-                        currentWindowProcessInfo.ProcessName = processName;
-                        currentWindowProcessInfo.WindowHandle = windowHandle;
-
-                        // Get window title
-                        if (getWindowTitle)
-                        {
-                            StringBuilder windowTitleBuilder = new StringBuilder(256);
-                            GetWindowText(windowHandle, windowTitleBuilder, windowTitleBuilder.Capacity);
-                            string windowTitle = windowTitleBuilder.ToString();
-                            currentWindowProcessInfo.WindowTitle = windowTitle;
-                        }
-                        
-                        return currentWindowProcessInfo;
-                    }
-                    else
+                    try
                     {
-                        Debug.WriteLine($"No change in process, return existing info");
-                        return currentWindowProcessInfo;
+                        using (Process process = Process.GetProcessById((int)processId))
+                        {
+                            processName = process.ProcessName;
+                        }
                     }
+                    catch (ArgumentException)
+                    {
+                        // Process might have exited
+                        processName = "Exited";
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Error getting process info: {ex.Message}");
+                        processName = "AccessDenied";
+                    }
+
+                    currentWindowProcessInfo.ProcessName = processName;
+                    currentWindowProcessInfo.WindowHandle = windowHandle;
+
+                    // Get window title
+                    if (getWindowTitle)
+                    {
+                        StringBuilder windowTitleBuilder = new StringBuilder(256);
+                        GetWindowText(windowHandle, windowTitleBuilder, windowTitleBuilder.Capacity);
+                        string windowTitle = windowTitleBuilder.ToString();
+                        currentWindowProcessInfo.WindowTitle = windowTitle;
+                    }
+
+                    return currentWindowProcessInfo;
                 }
+                else
+                {
+                    Debug.WriteLine($"No change in process, return existing info");
+                    return currentWindowProcessInfo;
+                }
+            }
             }
             catch (Exception ex)
             {
