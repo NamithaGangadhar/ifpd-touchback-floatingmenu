@@ -420,7 +420,7 @@ namespace TouchDataCaptureService
         private static bool _detailedHeaderWritten = false;
         private static bool _serialHeaderWritten = false;
 
-        private static string SkipProcessName = "notepad++";
+        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "ScreenPaint" };
 
         private static void ProcessCommandLineArgs(string[] args)
         {
@@ -543,7 +543,7 @@ namespace TouchDataCaptureService
 
             IntPtr hwnd = CreateWindowExW(
                 0, wc.lpszClassName, "",
-                0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
                 IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
 
             RegisterHid(hwnd);
@@ -997,7 +997,7 @@ namespace TouchDataCaptureService
                     for (ushort i = 1; i <= contactCount; i++)
                     {
                         var decoded = DecodeHIDReport(header.hDevice, dataPtr, (uint)bytes, i);
-                        if (decoded.IsValid && !decoded.ProcessName.Equals(SkipProcessName))
+                        if (decoded.IsValid && !SkipProcesses.Contains(decoded.ProcessName))
                         {
                             var decodedLogString = (i != contactCount) ? $"[HID] {decoded.Summary}" : $"[HID] {decoded.Summary}\n";
                             LogDecoded(decodedLogString);
@@ -1112,28 +1112,39 @@ namespace TouchDataCaptureService
                     HID_USAGE_DIGITIZER_CONTACT_COUNT, out uint contactCount, preparsedData, reportData, reportSize);
                 result.ContactCount = contactCount;
 
-                // Get X coordinate
+                // Get X and Y coordinates (HID logical values)
                 if (HidP_GetUsageValue(HIDP_REPORT_TYPE.HidP_Input, HID_USAGE_PAGE_GENERIC_DESKTOP, linkCollection,
                     HID_USAGE_GENERIC_X, out uint x, preparsedData, reportData, reportSize) == HIDP_STATUS_SUCCESS)
                 {
                     result.X = (int)x;
                 }
 
-                // Get Y coordinate
                 if (HidP_GetUsageValue(HIDP_REPORT_TYPE.HidP_Input, HID_USAGE_PAGE_GENERIC_DESKTOP, linkCollection,
                     HID_USAGE_GENERIC_Y, out uint y, preparsedData, reportData, reportSize) == HIDP_STATUS_SUCCESS)
                 {
                     result.Y = (int)y;
                 }
 
-                //Get Foreground Window Process info 
-                if (result.X > 0 && result.Y > 0)
+                // Get HID logical ranges for this device
+                var logicalRanges = GetHidLogicalRanges(hDevice);
+                
+                // Convert HID coordinates to screen coordinates for process detection
+                if (result.X > 0 && result.Y > 0 && logicalRanges.ContainsKey("X") && logicalRanges.ContainsKey("Y"))
                 {
-                    var WindowProcessData = WindowProcess.GetProcessAtPoint(result.X, result.Y);
-                    result.ProcessName = WindowProcessData.ProcessName;
-                    result.ProcessId = WindowProcessData.ProcessId;
-                    result.WindowHandle = WindowProcessData.WindowHandle;
-                    result.WindowTitle = WindowProcessData.WindowTitle;
+                    var (screenX, screenY) = WindowProcess.ConvertHidToScreenCoordinates(
+                        result.X, result.Y,
+                        logicalRanges["X"].min, logicalRanges["X"].max,
+                        logicalRanges["Y"].min, logicalRanges["Y"].max
+                    );
+                    
+                    // Now use screen coordinates for process detection
+                    var windowProcessData = WindowProcess.GetProcessAtPoint(screenX, screenY, true);
+                    result.ProcessName = windowProcessData.ProcessName;
+                    result.ProcessId = windowProcessData.ProcessId;
+                    result.WindowHandle = windowProcessData.WindowHandle;
+                    result.WindowTitle = windowProcessData.WindowTitle;
+                    
+                    Debug.WriteLine($"HID({result.X},{result.Y}) -> Screen({screenX},{screenY}) -> Process: {result.ProcessName}");
                 }
 
                 // Get Contact ID
