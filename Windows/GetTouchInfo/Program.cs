@@ -27,6 +27,7 @@ namespace TouchDataCaptureService
         private static Thread? _serialReaderThread;
         private static volatile bool _serialThreadRunning = false;
         private static bool SendRawDataSerial = false;
+        private static bool IsBypassEnabled = false;
 
         // ===================== DYNAMIC COORDINATE SCALING =====================
         private static class CoordinateScaler
@@ -459,7 +460,7 @@ namespace TouchDataCaptureService
                             i++; // Skip next argument as it's the value
                         }
                         break;
-                    case "_BAUDRATE":
+                    case "-BAUDRATE":
                     case "--BAUDRATE":
                         if (i + 1 < args.Length && int.TryParse(args[i + 1], out int baudRate))
                         {
@@ -470,6 +471,10 @@ namespace TouchDataCaptureService
                     case "-USERAW":
                     case "--USERAW":
                         SendRawDataSerial = true;
+                        break;
+                    case "-ENABLEBYPASS":
+                    case "--ENABLEBYPASS":
+                        IsBypassEnabled = true;
                         break;
                     case "-H":
                     case "--HELP":
@@ -486,13 +491,14 @@ namespace TouchDataCaptureService
             Console.WriteLine("Usage: TouchDataCaptureService.exe [options]");
             Console.WriteLine();
             Console.WriteLine("Options:");
-            Console.WriteLine("  -port <COMx>     Set serial port (e.g., -port COM3)");
-            Console.WriteLine("  --port <COMx>    Set serial port (e.g., --port COM3)");
-            Console.WriteLine(" -baudrate <Value> Set serial baudrate (e.g., -baudrate 9600");
-            Console.WriteLine(" --baudrate <Value> Set serial baudrate (e.g., --baudrate 9600");
-            Console.WriteLine(" -useraw Sends Raw data via serial. By default decoded data is being sent serially");
-            Console.WriteLine(" --useraw Sends Raw data via serial. By default decoded data is being sent serially");
-            Console.WriteLine("  -h, --help       Show this help message");
+            PrintArgsDescription("-port <COMx>","Set serial port (e.g., -port COM3)");
+            PrintArgsDescription("--port <COMx>","Set serial port (e.g., --port COM3)");
+            PrintArgsDescription("-baudrate <Value>","Set serial baudrate (e.g., -baudrate 9600");
+            PrintArgsDescription("--baudrate <Value>","Set serial baudrate (e.g., --baudrate 9600");
+            PrintArgsDescription("-useraw","Sends Raw data via serial. By default decoded data is being sent serially");
+            PrintArgsDescription("--useraw","Sends Raw data via serial. By default decoded data is being sent serially");
+            PrintArgsDescription("-enablebypass", "If enabled, Touch events originating from Floating Menu and Annotation Tool are bypassed. Not enabled by default.");
+            PrintArgsDescription("-h, --help", "Show this help message");
             Console.WriteLine();
             Console.WriteLine("Features:");
             Console.WriteLine("  • Dynamic coordinate scaling: Automatically normalizes touch coordinates");
@@ -508,6 +514,15 @@ namespace TouchDataCaptureService
             Console.WriteLine("  TouchDataCaptureService.exe --port COM10");
             Console.WriteLine("  Pass multiple arguments as shown below: ");
             Console.WriteLine("     TouchDataCaptureService.exe --port COM4 --baudrate 9600 --useraw");
+            Console.WriteLine("     TouchDataCaptureService.exe -port COM4 -baudrate 9600 -enablebypass");
+        }
+
+        private static void PrintArgsDescription(string args, string explanation)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write($"  {args.PadRight(25)}");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine(explanation);
         }
 
         // ===================== MAIN =====================
@@ -1172,12 +1187,12 @@ namespace TouchDataCaptureService
                 }
                 
                 // Convert HID coordinates to screen coordinates for process detection
-                if (result.X > 0 && result.Y > 0)
+                if (IsBypassEnabled && result.X > 0 && result.Y > 0)
                 {
                     var (screenX, screenY) = WindowProcess.ConvertHidToScreenCoordinates(result.X, result.Y);
                     
                     // Now use screen coordinates for process detection
-                    var windowProcessData = WindowProcess.GetProcessAtPoint(screenX, screenY, true);
+                    var windowProcessData = WindowProcess.GetProcessAtPoint(screenX, screenY);
                     result.ProcessName = windowProcessData.ProcessName;
                     result.ProcessId = windowProcessData.ProcessId;
                     result.WindowHandle = windowProcessData.WindowHandle;
