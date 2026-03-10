@@ -2,8 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Style x:Key="NavIconItemStyle" TargetType="ListBoxItem">
-        <Setter Property="Width" Value="60"/>
-        <Setter Property="Height" Value="70"/>
+        <Setter Property="Width" Value="Auto"/>
+        <Setter Property="Height" Value="Auto"/>
         <Setter Property="Margin" Value="0,8,0,0"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>

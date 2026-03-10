@@ -7,7 +7,7 @@
       mc:Ignorable="d" 
       Background="Transparent"
       Title="SignalSource" 
-      Width="270"
+      Width="260"
       Height="280">
     <Page.Resources>
 

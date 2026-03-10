@@ -17,8 +17,8 @@ namespace InteractiveDisplayCapture
     {
         private const int WM_MOVING = 0x0216;
 
-        private const double ClosedWidth = 40;
-        private const double ClosedHeight = 120;
+        //private const double ClosedWidth = 40;
+        //private const double ClosedHeight = 120;
 
         private const double OpenWidth = 500;
         private const double OpenHeight = 400;
@@ -48,42 +48,46 @@ namespace InteractiveDisplayCapture
             var screen = System.Windows.Forms.Screen.FromHandle(
                 new WindowInteropHelper(this).Handle);
 
+            double screenWidth = screen.WorkingArea.Width;
+            double screenHeight = screen.WorkingArea.Height;
+
+            System.Diagnostics.Debug.WriteLine($"Screen Width: {screenWidth}");
+            System.Diagnostics.Debug.WriteLine($"Screen Height: {screenHeight}");
+
             if (!_menuOpen)
             {
-                // OPEN STATE
-                this.Width = OpenWidth;
-                this.Height = OpenHeight;
+                // OPEN STATE (percentage of screen)
+                this.Width = screenWidth * 0.18;   // 18% of screen width
+                this.Height = screenHeight * 0.45; // 45% of screen height
 
-                // keep right edge locked
                 this.Left = screen.WorkingArea.Right - this.Width;
 
-                // keep vertical center
                 this.Top = screen.WorkingArea.Top +
-                           (screen.WorkingArea.Height - this.Height) / 2;
+                           (screenHeight - this.Height) / 2;
 
                 EdgeMenu.Visibility = Visibility.Visible;
-                
+
                 _menuOpen = true;
                 EdgeHandle.Visibility = Visibility.Collapsed;
             }
             else
             {
                 // CLOSED STATE
-                this.Width = ClosedWidth;
-                this.Height = ClosedHeight;
+                this.Width = screenWidth * 0.03;  // thin edge handle
+                this.Height = screenHeight * 0.25;
 
                 this.Left = screen.WorkingArea.Right - this.Width;
 
                 this.Top = screen.WorkingArea.Top +
-                           (screen.WorkingArea.Height - this.Height) / 2;
+                           (screenHeight - this.Height) / 2;
 
                 EdgeMenu.Visibility = Visibility.Collapsed;
-               
-                _menuOpen = false;
 
+                _menuOpen = false;
                 EdgeHandle.Visibility = Visibility.Visible;
             }
-            if(_cameraWindow != null)
+
+            if (_cameraWindow != null)
             {
                 FlyoutContainer.Visibility = Visibility.Visible;
                 EdgeMenu.SelectMenuItem(2);
@@ -137,8 +141,10 @@ namespace InteractiveDisplayCapture
             var screen = System.Windows.Forms.Screen.FromHandle(
         new WindowInteropHelper(this).Handle);
 
-            this.Width = ClosedWidth;
-            this.Height = ClosedHeight;
+            double screenWidth = screen.WorkingArea.Width;
+            double screenHeight = screen.WorkingArea.Height;
+            this.Width = screenWidth * 0.035;  // thin edge handle
+            this.Height = screenHeight * 0.25;
 
             this.Left = screen.WorkingArea.Right - this.Width;
 
