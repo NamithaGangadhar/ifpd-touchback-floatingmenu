@@ -1,3 +1,18 @@
+/****************************************************************************** 
+* Copyright (C) 2026 Intel Corporation
+* 
+* This software and the related documents are Intel copyrighted materials,
+* and your use of them is governed by the express license under which they
+* were provided to you ("License"). Unless the License provides otherwise,
+* you may not use, modify, copy, publish, distribute, disclose or transmit
+* this software or the related documents without Intel's prior written
+* permission.
+* 
+* This software and the related documents are provided as is, with no
+* express or implied warranties, other than those that are expressly stated
+* in the License.
+*******************************************************************************/
+
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -43,27 +58,28 @@ void parse_touch(char *line)
     if (strncmp(line, "TOUCH", 5) != 0)
         return;
 
-    uint16_t x, y;
-    uint8_t  cid, tip;
-    uint16_t pressure;
+    // C# format: TOUCH,x,y,cid,tip,pressure,inrange,confidence,width,height,azimuth,altitude,twist,contactcount
+    uint16_t x, y, azimuth, altitude, twist;
+    uint8_t  cid, tip, pressure, inrange, confidence, width, height, contact_count;
 
-    if (sscanf(line, "TOUCH,%hu,%hu,%hhu,%hhu,%hu",
-               &x, &y, &cid, &tip, &pressure) == 5)
+    if (sscanf(line, "TOUCH,%hu,%hu,%hhu,%hhu,%hhu,%hhu,%hhu,%hhu,%hhu,%hu,%hu,%hu,%hhu",
+               &x, &y, &cid, &tip, &pressure, &inrange, &confidence,
+               &width, &height, &azimuth, &altitude, &twist, &contact_count) == 13)
     {
-        // C# already sends normalized 0-32767 coords (via GetSystemMetrics).
-        // Just clamp to be safe — no re-scaling needed.
+        // C# already sends normalized 0-32767 coords. Clamp to be safe.
         if (x > HID_MAX) x = HID_MAX;
         if (y > HID_MAX) y = HID_MAX;
 
-        // ESP_LOGI(TAG, "Touch: hid=(%d,%d) cid=%d tip=%d press=%d",
-        //           x, y, cid, tip, pressure);
+        // ESP_LOGI(TAG, "Touch: (%d,%d) cid=%d tip=%d press=%d rng=%d conf=%d cnt=%d",
+        //          x, y, cid, tip, pressure, inrange, confidence, contact_count);
 
-        hid_touch_send(x, y, cid, tip, pressure);
+        hid_touch_send(x, y, cid, tip, pressure, inrange, confidence,
+                       width, height, azimuth, altitude, twist, contact_count);
     }
-    // else
-    // {
-    //     ESP_LOGW(TAG, "Parse failed: [%s]", line);
-    // }
+    else
+    {
+         ESP_LOGW(TAG, "Parse failed: [%s]", line);
+    }
 }
 
 static QueueHandle_t line_queue;
