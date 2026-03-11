@@ -13,6 +13,7 @@
 * in the License.
 *******************************************************************************/
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
@@ -35,12 +36,34 @@ namespace TouchDataCaptureService
 
         // ===================== SERIAL CONFIGURATION =====================
         // Make these configurable - can be overridden by config file or command line
-        private static string SerialPortName = "COM8"; // Default value
-        private static int SerialBaudRate = 2000000; // Changed to 2mbps
+        private static string SerialPortName = "COM4"; // Default value
+        private static int SerialBaudRate = 3000000; // Changed to 3mbps
         private static SerialPort? _serialPort;
         private static Thread? _serialReaderThread;
+        private static Thread? _serialSenderThread;
         private static volatile bool _serialThreadRunning = false;
+        private static volatile bool _serialSenderThreadRunning = false;
         private static bool SendRawDataSerial = false;
+        private static bool EnableSerialLogging = false; // Disabled by default
+
+        // UART Send Queue for decoupling
+        private class SerialQueueItem
+        {
+            public bool IsRawData { get; set; }
+            public string? RawData { get; set; }
+            public DecodedTouchData? TouchData { get; set; }
+            public IntPtr DeviceHandle { get; set; }
+        }
+        private static readonly ConcurrentQueue<SerialQueueItem> _serialSendQueue = new();
+        private const int MaxQueueSize = 1000;
+        
+        // Timing constants for serial operations
+        private const int SerialReaderSleepMs = 2;
+        private const int SerialSenderSleepMs = 1;
+        private const int SerialErrorRetryMs = 100;
+        private const int SerialInitDelayMs = 2000;
+        private const int SenderThreadJoinTimeoutMs = 3000;
+        private const int ReaderThreadJoinTimeoutMs = 2000;
 
         // ===================== DYNAMIC COORDINATE SCALING =====================
         private static class CoordinateScaler
@@ -443,11 +466,6 @@ namespace TouchDataCaptureService
         private static readonly Dictionary<IntPtr, IntPtr> devicePreparsedData = new();
         private static readonly Dictionary<IntPtr, string> deviceNames = new();
 
-        // Track if headers have been written
-        private static bool _decodedHeaderWritten = false;
-        private static bool _detailedHeaderWritten = false;
-        private static bool _serialHeaderWritten = false;
-
         private static void ProcessCommandLineArgs(string[] args)
         {
             for (int i = 0; i < args.Length; i++)
@@ -476,6 +494,10 @@ namespace TouchDataCaptureService
                     case "--USERAW":
                         SendRawDataSerial = true;
                         break;
+                    case "-SERIALLOG":
+                    case "--SERIALLOG":
+                        EnableSerialLogging = true;
+                        break;
                     case "-H":
                     case "--HELP":
                         ShowHelp();
@@ -493,10 +515,12 @@ namespace TouchDataCaptureService
             Console.WriteLine("Options:");
             Console.WriteLine("  -port <COMx>     Set serial port (e.g., -port COM3)");
             Console.WriteLine("  --port <COMx>    Set serial port (e.g., --port COM3)");
-            Console.WriteLine(" -baudrate <Value> Set serial baudrate (e.g., -baudrate 9600");
-            Console.WriteLine(" --baudrate <Value> Set serial baudrate (e.g., --baudrate 9600");
-            Console.WriteLine(" -useraw Sends Raw data via serial. By default decoded data is being sent serially");
-            Console.WriteLine(" --useraw Sends Raw data via serial. By default decoded data is being sent serially");
+            Console.WriteLine("  -baudrate <num>  Set serial baudrate (e.g., -baudrate 9600)");
+            Console.WriteLine("  --baudrate <num> Set serial baudrate (e.g., --baudrate 9600)");
+            Console.WriteLine("  -useraw          Sends Raw data via serial. By default decoded data is being sent serially");
+            Console.WriteLine("  --useraw         Sends Raw data via serial. By default decoded data is being sent serially");
+            Console.WriteLine("  -seriallog       Enable serial communication logging (disabled by default)");
+            Console.WriteLine("  --seriallog      Enable serial communication logging (disabled by default)");
             Console.WriteLine("  -h, --help       Show this help message");
             Console.WriteLine();
             Console.WriteLine("Features:");
@@ -587,8 +611,9 @@ namespace TouchDataCaptureService
             Debug.WriteLine("• Press 'R' key anytime to reset scaling and recalibrate");
             Debug.WriteLine("Touch the screen to see logs...\n");
 
-            // Start serial reader thread
+            // Start serial reader and sender threads
             StartSerialReaderThread();
+            StartSerialSenderThread();
 
             while (GetMessage(out MSG msg, IntPtr.Zero, 0, 0))
             {
@@ -617,9 +642,12 @@ namespace TouchDataCaptureService
                 Debug.WriteLine($"[Serial] Opened {SerialPortName} @ {SerialBaudRate}");
 
                 // Give ESP32 time to finish booting TinyUSB before first touch event arrives
-                Thread.Sleep(2000);
+                Thread.Sleep(SerialInitDelayMs);
 
-                WriteSerialLogHeader();
+                if (EnableSerialLogging)
+                {
+                    WriteSerialLogHeader();
+                }
             }
             catch (Exception ex)
             {
@@ -691,7 +719,7 @@ namespace TouchDataCaptureService
                         }
                     }
 
-                    Thread.Sleep(10); // Small delay to prevent excessive CPU usage
+                    Thread.Sleep(SerialReaderSleepMs);
                 }
                 catch (TimeoutException)
                 {
@@ -708,7 +736,117 @@ namespace TouchDataCaptureService
             Debug.WriteLine("Serial reader thread stopped");
         }
 
+        private static void StartSerialSenderThread()
+        {
+            if (_serialPort == null || !_serialPort.IsOpen)
+            {
+                Debug.WriteLine("Serial port not available, skipping serial sender thread");
+                return;
+            }
+
+            _serialSenderThreadRunning = true;
+            _serialSenderThread = new Thread(SerialSenderWorker)
+            {
+                IsBackground = true,
+                Name = "SerialSender",
+                Priority = ThreadPriority.AboveNormal // Higher priority for sending
+            };
+            _serialSenderThread.Start();
+            Debug.WriteLine("Serial sender thread started");
+        }
+
+        private static void SerialSenderWorker()
+        {
+            Debug.WriteLine("Serial sender worker started");
+
+            while (_serialSenderThreadRunning)
+            {
+                try
+                {
+                    if (_serialSendQueue.TryDequeue(out SerialQueueItem? item))
+                    {
+                        if (item.IsRawData && item.RawData != null)
+                        {
+                            // Send raw data
+                            SendSerialDataInternal(item.RawData);
+                        }
+                        else if (!item.IsRawData && item.TouchData != null)
+                        {
+                            // Send decoded touch data
+                            SendTouchDataViaSerialInternal(item.TouchData, item.DeviceHandle);
+                        }
+                    }
+                    else
+                    {
+                        // Queue is empty, sleep briefly to avoid busy-waiting
+                        Thread.Sleep(SerialSenderSleepMs);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Serial sender worker error: {ex.Message}");
+                    LogSerialData($"SENDER_ERROR: {ex.Message}");
+                    Thread.Sleep(SerialErrorRetryMs);
+                }
+            }
+
+            Debug.WriteLine("Serial sender worker stopped");
+        }
+
+        private static void EnqueueSerialData(string rawData)
+        {
+            // Check queue size to prevent memory issues
+            if (_serialSendQueue.Count >= MaxQueueSize)
+            {
+                Debug.WriteLine($"⚠️ Serial queue full ({MaxQueueSize}), dropping data");
+                return;
+            }
+
+            _serialSendQueue.Enqueue(new SerialQueueItem
+            {
+                IsRawData = true,
+                RawData = rawData
+            });
+        }
+
+        private static void EnqueueTouchData(DecodedTouchData touchData, IntPtr hDevice)
+        {
+            // Check queue size to prevent memory issues
+            if (_serialSendQueue.Count >= MaxQueueSize)
+            {
+                Debug.WriteLine($"⚠️ Serial queue full ({MaxQueueSize}), dropping data");
+                return;
+            }
+
+            _serialSendQueue.Enqueue(new SerialQueueItem
+            {
+                IsRawData = false,
+                TouchData = touchData,
+                DeviceHandle = hDevice
+            });
+        }
+
+        // Public methods that enqueue data (non-blocking)
         public static void SendSerialData(string data)
+        {
+            EnqueueSerialData(data);
+        }
+
+        public static void SendTouchDataViaSerial(DecodedTouchData touchData, IntPtr hDevice)
+        {
+            if (touchData.IsValid)
+            {
+                EnqueueTouchData(touchData, hDevice);
+            }
+        }
+
+        public static void SendTouchDataViaSerial(string rawData)
+        {
+            EnqueueSerialData(rawData);
+        }
+
+        // Internal methods that actually send data (called by sender thread)
+        private static void SendSerialDataInternal(string data)
         {
             if (_serialPort != null && _serialPort.IsOpen)
             {
@@ -716,11 +854,9 @@ namespace TouchDataCaptureService
                 {
                     _serialPort.WriteLine(data);
                     LogSerialData($"TX: {data}");
-                    Debug.WriteLine($"Serial TX: {data}");
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Failed to send serial data: {ex.Message}");
                     LogSerialData($"TX_ERROR: {ex.Message}");
                 }
             }
@@ -730,7 +866,7 @@ namespace TouchDataCaptureService
             }
         }
 
-        public static void SendTouchDataViaSerial(DecodedTouchData touchData,IntPtr hDevice)
+        private static void SendTouchDataViaSerialInternal(DecodedTouchData touchData, IntPtr hDevice)
         {
             if (_serialPort != null && _serialPort.IsOpen && touchData.IsValid)
             {
@@ -758,8 +894,7 @@ namespace TouchDataCaptureService
                         touchData.ContactCount          // 12: Contact Count
                     );
 
-                    Debug.WriteLine($"TX → {message}");
-                    SendSerialData(message);
+                    SendSerialDataInternal(message);
                 }
                 catch (Exception ex)
                 {
@@ -772,30 +907,24 @@ namespace TouchDataCaptureService
             }
         }
 
-        public static void SendTouchDataViaSerial(string rawData)
-        {
-            if (_serialPort != null && _serialPort.IsOpen)
-            {
-                try
-                {
-                    SendSerialData(rawData);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Failed to send touch data via serial: {ex.Message}");
-                }
-            }
-        }
-
         private static void CleanupSerial()
         {
-            _serialThreadRunning = false;
-
-            if (_serialReaderThread != null && _serialReaderThread.IsAlive)
+            // Stop sender thread first to finish sending queued data
+            _serialSenderThreadRunning = false;
+            if (_serialSenderThread != null && _serialSenderThread.IsAlive)
             {
-                _serialReaderThread.Join(2000); // Wait up to 2 seconds for thread to finish
+                Debug.WriteLine($"Waiting for serial sender thread to finish ({_serialSendQueue.Count} items in queue)...");
+                _serialSenderThread.Join(SenderThreadJoinTimeoutMs);
             }
 
+            // Then stop reader thread
+            _serialThreadRunning = false;
+            if (_serialReaderThread != null && _serialReaderThread.IsAlive)
+            {
+                _serialReaderThread.Join(ReaderThreadJoinTimeoutMs);
+            }
+
+            // Finally close the port
             if (_serialPort != null && _serialPort.IsOpen)
             {
                 try
@@ -809,6 +938,10 @@ namespace TouchDataCaptureService
                     Debug.WriteLine($"Error closing serial port: {ex.Message}");
                 }
             }
+
+            // Clear any remaining queue items
+            while (_serialSendQueue.TryDequeue(out _)) { }
+            Debug.WriteLine("Serial cleanup complete");
         }
 
         // ===================== LOG INITIALIZATION =====================
@@ -821,7 +954,7 @@ namespace TouchDataCaptureService
                 File.Delete(DecodedLogFile);
             if (File.Exists(DetailedLogFile))
                 File.Delete(DetailedLogFile);
-            if (File.Exists(SerialLogFile))
+            if (EnableSerialLogging && File.Exists(SerialLogFile))
                 File.Delete(SerialLogFile);
 
             // Write headers for decoded logs only (not for raw logs)
@@ -864,7 +997,6 @@ namespace TouchDataCaptureService
             };
 
             File.WriteAllLines(DecodedLogFile, header);
-            _decodedHeaderWritten = true;
         }
 
         private static void WriteDetailedLogHeader()
@@ -900,7 +1032,6 @@ namespace TouchDataCaptureService
             };
 
             File.WriteAllLines(DetailedLogFile, header);
-            _detailedHeaderWritten = true;
         }
 
         private static void WriteSerialLogHeader()
@@ -922,7 +1053,6 @@ namespace TouchDataCaptureService
             };
 
             File.WriteAllLines(SerialLogFile, header);
-            _serialHeaderWritten = true;
         }
 
         // ===================== REGISTRATION =====================
@@ -1472,6 +1602,10 @@ namespace TouchDataCaptureService
         private static void LogSerialData(string text)
         {
             string line = $"{DateTime.Now:HH:mm:ss.fff} {text}";
+            Debug.WriteLine($"Serial: {line}");
+
+            if (!EnableSerialLogging)
+                return;
 
             lock (_serialLogLock)
             {
@@ -1484,8 +1618,6 @@ namespace TouchDataCaptureService
                     Debug.WriteLine($"Serial log error: {ex.Message}");
                 }
             }
-
-            Debug.WriteLine($"Serial: {line}");
         }
 
         private static Dictionary<string, (int min, int max)> GetHidLogicalRanges(IntPtr hDevice)
