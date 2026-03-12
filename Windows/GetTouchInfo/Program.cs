@@ -37,7 +37,7 @@ namespace TouchDataCaptureService
 
         // ===================== SERIAL CONFIGURATION =====================
         // Make these configurable - can be overridden by config file or command line
-        private static string SerialPortName = "COM4"; // Default value
+        private static string SerialPortName = "COM10"; // Default value
         private static int SerialBaudRate = 3000000; // Changed to 3mbps
         private static SerialPort? _serialPort;
         private static Thread? _serialReaderThread;
@@ -45,7 +45,27 @@ namespace TouchDataCaptureService
         private static volatile bool _serialThreadRunning = false;
         private static volatile bool _serialSenderThreadRunning = false;
         private static bool SendRawDataSerial = false;
+        private static bool EnableSerialLogging = false; // Disabled by default
         private static bool IsBypassEnabled = false;
+
+        // UART Send Queue for decoupling
+        private class SerialQueueItem
+        {
+            public bool IsRawData { get; set; }
+            public string? RawData { get; set; }
+            public DecodedTouchData? TouchData { get; set; }
+            public IntPtr DeviceHandle { get; set; }
+        }
+        private static readonly ConcurrentQueue<SerialQueueItem> _serialSendQueue = new();
+        private const int MaxQueueSize = 1000;
+
+        // Timing constants for serial operations
+        private const int SerialReaderSleepMs = 2;
+        private const int SerialSenderSleepMs = 1;
+        private const int SerialErrorRetryMs = 100;
+        private const int SerialInitDelayMs = 2000;
+        private const int SenderThreadJoinTimeoutMs = 3000;
+        private const int ReaderThreadJoinTimeoutMs = 2000;
 
         // ===================== DYNAMIC COORDINATE SCALING =====================
         private static class CoordinateScaler
@@ -493,6 +513,7 @@ namespace TouchDataCaptureService
                     case "-ENABLEBYPASS":
                     case "--ENABLEBYPASS":
                         IsBypassEnabled = true;
+                        break;
                     case "-SERIALLOG":
                     case "--SERIALLOG":
                         EnableSerialLogging = true;
@@ -514,8 +535,8 @@ namespace TouchDataCaptureService
             Console.WriteLine("Options:");
             PrintArgsDescription("-port <COMx>","Set serial port (e.g., -port COM3)");
             PrintArgsDescription("--port <COMx>","Set serial port (e.g., --port COM3)");
-            PrintArgsDescription("-baudrate <Value>","Set serial baudrate (e.g., -baudrate 9600");
-            PrintArgsDescription("--baudrate <Value>","Set serial baudrate (e.g., --baudrate 9600");
+            PrintArgsDescription("-baudrate <Value>","Set serial baudrate (e.g., -baudrate 9600)");
+            PrintArgsDescription("--baudrate <Value>","Set serial baudrate (e.g., --baudrate 9600)");
             PrintArgsDescription("-useraw","Sends Raw data via serial. By default decoded data is being sent serially");
             PrintArgsDescription("--useraw","Sends Raw data via serial. By default decoded data is being sent serially");
             PrintArgsDescription("-enablebypass", "If enabled, Touch events originating from Floating Menu and Annotation Tool are bypassed. Not enabled by default.");
@@ -530,7 +551,7 @@ namespace TouchDataCaptureService
             Console.WriteLine("  • Touch all corners of the screen to establish coordinate range");
             Console.WriteLine();
             Console.WriteLine("Configuration:");
-            Console.WriteLine("  Baud rate: 921600 (default)");
+            Console.WriteLine("  Baud rate: 3000000 (default)");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  TouchDataCaptureService.exe");
@@ -782,8 +803,10 @@ namespace TouchDataCaptureService
                         }
                         else if (!item.IsRawData && item.TouchData != null)
                         {
-                            // Send decoded touch data
-                            SendTouchDataViaSerialInternal(item.TouchData, item.DeviceHandle);
+                            if (deviceLogicalRanges.TryGetValue(item.DeviceHandle, out var logicalRanges))
+                            {
+                                SendTouchDataViaSerialInternal(item.TouchData, logicalRanges);
+                            }
                         }
                     }
                     else
@@ -1171,12 +1194,7 @@ namespace TouchDataCaptureService
 
                             // Send touch data via serial
                             if (!SendRawDataSerial)
-                            {
-                                if (deviceLogicalRanges.TryGetValue(header.hDevice, out var logicalRanges))
-                                {
-                                    SendTouchDataViaSerial(decoded, logicalRanges);
-                                }
-                            }
+                                SendTouchDataViaSerial(decoded, header.hDevice);
                         }
                         if(!decoded.IsValid)
                         {
@@ -1317,7 +1335,7 @@ namespace TouchDataCaptureService
                 }
                 
                 // Convert HID coordinates to screen coordinates for process detection
-                if (IsBypassEnabled && result.X > 0 && result.Y > 0)
+                if (IsBypassEnabled && result.X >= 0 && result.Y >= 0)
                 {
                     var (screenX, screenY) = WindowProcess.ConvertHidToScreenCoordinates(result.X, result.Y);
                     
@@ -1635,9 +1653,12 @@ namespace TouchDataCaptureService
                 $"Confidence: {data.Confidence}",
                 $"ProcessName: {data.ProcessName}",
                 $"ProcessID: {data.ProcessId}",
-                $"WindowTitle: {data.WindowTitle}"
             };
 
+            if (!string.IsNullOrWhiteSpace(data.WindowTitle))
+            {
+                details.Add($"WindowTitle: {data.WindowTitle}");
+            }
             if (data.Pressure > 0) details.Add($"Pressure: {data.Pressure}");
             if (data.Width > 0) details.Add($"Width: {data.Width}");
             if (data.Height > 0) details.Add($"Height: {data.Height}");

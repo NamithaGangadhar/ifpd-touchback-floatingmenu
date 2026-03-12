@@ -38,15 +38,6 @@ namespace TouchDataCaptureService.Helpers
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr OpenProcess(uint processAccess, bool inheritHandle, uint processId);
-
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern uint GetModuleFileNameEx(IntPtr hProcess, IntPtr hModule, StringBuilder lpBaseName, uint nSize);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr hObject);
-
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
@@ -87,13 +78,33 @@ namespace TouchDataCaptureService.Helpers
         public static (int screenX, int screenY) ConvertHidToScreenCoordinates(
             int hidX, int hidY)
         {
-            // Map HID range to screen range
-            double normalizedX = (double)(hidX - logicalMinX) / (logicalMaxX - logicalMinX);
-            double normalizedY = (double)(hidY - logicalMinY) / (logicalMaxY - logicalMinY);
+            // Map HID range to screen range, guarding against zero logical ranges
+            double rangeX = logicalMaxX - logicalMinX;
+            double rangeY = logicalMaxY - logicalMinY;
+            double normalizedX = 0.0;
+            double normalizedY = 0.0;
 
+            if (rangeX != 0)
+                normalizedX = (double)(hidX - logicalMinX) / rangeX;
+            
+            if (rangeY != 0)
+                normalizedY = (double)(hidY - logicalMinY) / rangeY;
+            
             int screenX = (int)(normalizedX * screenWidth);
             int screenY = (int)(normalizedY * screenHeight);
-
+            
+            // Clamp to valid screen coordinates (0..width-1 / 0..height-1)
+            if (screenWidth > 0)
+                screenX = System.Math.Max(0, System.Math.Min(screenWidth - 1, screenX));
+            else
+                screenX = 0;
+            
+            if (screenHeight > 0)
+                screenY = System.Math.Max(0, System.Math.Min(screenHeight - 1, screenY));
+            
+            else
+                screenY = 0;
+            
             return (screenX, screenY);
         }
 
