@@ -191,35 +191,36 @@ namespace InteractiveDisplayCapture
             EdgeMenu.PCStatus.Text = _signalSourcePage.UpdateDevice();
         }
 
+        private void FlyoutPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Page page)
+            {
+                return;
+            }
+
+            double targetWidth = page.ActualWidth;
+            double targetHeight = page.ActualHeight;
+
+            var animation = new DoubleAnimation
+            {
+                From = 0,
+                To = targetWidth,
+                Duration = TimeSpan.FromMilliseconds(250)
+            };
+
+            FlyoutContainer.BeginAnimation(WidthProperty, animation);
+            FlyoutContainer.Height = targetHeight;
+        }
+
         private void ShowFlyout(Page page)
         {
             FlyoutFrame.Content = page;
             FlyoutContainer.Visibility = Visibility.Visible;
             FlyoutContainer.Margin = new Thickness(0, 100, 0, 0);
 
-            if (page is SignalSource signalPage)
-            {
-                signalPage.DeviceSelected += OpenCameraWindow;
-            }
-
-            page.Loaded += (s, e) =>
-            {
-                double targetWidth = page.ActualWidth;
-                double targetHeight = page.ActualHeight;
-
-                var animation = new DoubleAnimation
-                {
-                    From = 0,
-                    To = targetWidth,
-                    Duration = TimeSpan.FromMilliseconds(250)
-                };
-
-                FlyoutContainer.BeginAnimation(WidthProperty, animation);
-
-                FlyoutContainer.Height = targetHeight;
-
-            };
-
+            // Ensure we do not accumulate multiple Loaded handlers on the same page.
+            page.Loaded -= FlyoutPage_Loaded;
+            page.Loaded += FlyoutPage_Loaded;
             _flyoutOpen = true;
         }
 
