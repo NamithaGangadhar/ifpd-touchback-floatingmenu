@@ -1,0 +1,198 @@
+﻿<!--
+/******************************************************************************
+*
+* Copyright (C) 2026 Intel Corporation
+*
+* This software and the related documents are Intel copyrighted materials,
+* and your use of them is governed by the express license under which they
+* were provided to you ("License"). Unless the License provides otherwise,
+* you may not use, modify, copy, publish, distribute, disclose or transmit
+* this software or the related documents without Intel's prior written
+* permission.
+*
+* This software and the related documents are provided as is, with no
+* express or implied warranties, other than those that are expressly stated
+* in the License.
+*
+******************************************************************************* */
+-->
+
+<Page x:Class="FloatingMenu.Controls.SignalSource"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:FloatingMenu.Controls"
+      mc:Ignorable="d" 
+      Background="Transparent"
+      Title="SignalSource" 
+      Width="260"
+      Height="280">
+    <Page.Resources>
+
+        <Style x:Key="SignalSourceCardStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="15"/>
+            <Setter Property="Background" Value="#1565C0"/>
+            <Setter Property="Padding" Value="20"/>
+
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="25"
+                              ShadowDepth="6"
+                              Opacity="0.25"
+                              Direction="90"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DeviceListBoxItemStyle" TargetType="ListBoxItem">
+
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+
+            <!-- Custom Template -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ItemBorder"
+                        Background="Transparent"
+                        CornerRadius="10"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                        Padding="15,0,15,0"
+                                Margin="0,0,0,12">
+
+                            <ContentPresenter/>
+
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <!-- Hover Effect -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder"
+                                Property="Background"
+                                Value="#33FFFFFF"/>
+                            </Trigger>
+
+                            <!-- Selected Effect -->
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder"
+                                Property="Background"
+                                Value="#55FFFFFF"/>
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+
+            <!-- Disable if Disconnected -->
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="Disconnected">
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Opacity" Value="0.5"/>
+                </DataTrigger>
+            </Style.Triggers>
+
+        </Style>
+
+        <DataTemplate x:Key="DeviceItemTemplate">
+
+            <StackPanel Orientation="Horizontal"
+                Margin="0,10"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Center">
+
+                <Border x:Name="Indicator"
+                Width="58"
+                Height="58"
+                CornerRadius="8"
+                Background="#9E9E9E">
+
+                    <Path Height="38"
+                  Width="38"
+                  Stretch="Uniform"
+                  Fill="White"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Data="M160-160q-33 0-56.5-23.5T80-240v-120h80v120h640v-480H160v120H80v-120q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm300-140-56-58 83-82H80v-80h407l-83-82 56-58 180 180-180 180Z"/>
+                </Border>
+
+                <TextBlock Text="{Binding Name}"
+                   Foreground="White"
+                   FontSize="26"
+                   Margin="20,0,0,0"
+                   VerticalAlignment="Center"/>
+
+            </StackPanel>
+
+            <DataTemplate.Triggers>
+
+                <DataTrigger Binding="{Binding Status}" Value="Available">
+                    <Setter TargetName="Indicator"
+                    Property="Background"
+                    Value="#2196F3"/>
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Status}" Value="Connected">
+                    <Setter TargetName="Indicator"
+                    Property="Background"
+                    Value="#2E7D32"/>
+                </DataTrigger>
+
+            </DataTemplate.Triggers>
+
+        </DataTemplate>
+
+    </Page.Resources>
+   
+    <Grid Height="Auto" Width="Auto">
+        <Border CornerRadius="15"  Background="#1565C0">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="25"
+                     ShadowDepth="6"
+                     Opacity="0.25" 
+                         Direction="90"/>
+
+            </Border.Effect>
+            <StackPanel Margin="20">
+
+                <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center" 
+                        Margin="0,0,0,5">
+                    <Path Height="28"
+                  Width="28" 
+                  Stretch="Uniform" 
+                  Fill="White" 
+                  Data="M3.5 4V0.5H11.5V4M5 2.5H6M9 2.5H10M5.5 13V15M9.5 13V15M2.5 4.5H12.5V9.5L10.5 10.5V12.5H4.5V10.5L2.5 9.5V4.5Z"/>
+                    <TextBlock Text="Signal Source"
+                       FontSize="22"
+                       Foreground="White"
+                       FontWeight="Bold"
+                       Margin="10,0,0,10"/>
+                </StackPanel>
+
+                <Separator Margin="0,0,0,10" Background="White"/>
+
+                <!-- Device List -->
+                <ListBox x:Name="DeviceList"
+                    ItemsSource="{Binding Devices}"
+                    PreviewMouseLeftButtonUp="DeviceList_PreviewMouseLeftButtonUp"
+                     ItemContainerStyle="{StaticResource DeviceListBoxItemStyle}"
+                     ItemTemplate="{StaticResource DeviceItemTemplate}"
+                     Background="Transparent"
+                     BorderThickness="0"/>
+
+                <Image x:Name="CameraImage"
+                       Stretch="Uniform"
+                       HorizontalAlignment="Stretch"
+                       VerticalAlignment="Stretch"/>
+              
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>
