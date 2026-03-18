@@ -1,5 +1,6 @@
 /****************************************************************************** 
 * Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 * 
 * This software and the related documents are Intel copyrighted materials,
 * and your use of them is governed by the express license under which they
