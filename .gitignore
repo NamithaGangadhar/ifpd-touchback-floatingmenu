@@ -23,6 +23,23 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Development containers
+.devcontainer/
+
+# IDE and Editor files
+.vscode/
+*.code-workspace
+
+# Python test files (optional - only if you don't want to track any tests)
+pytest_*.py
+*test*.py
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
 # ===============================
 # ===== Windows C# App =========
 # ===============================
