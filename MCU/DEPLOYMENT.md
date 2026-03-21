@@ -74,7 +74,7 @@ Press `Ctrl+]` to exit the monitor.
 ### 1. Connect USB-OTG Port
 
 Once the firmware is running:
-1. Disconnect the USB-UART cable (optional - only needed for initial flash)
+1. Keep the USB-UART cable (needed for serial communication between IFPD and ESP32)
 2. Connect the **USB-OTG port** to the target computer (Laptop 2)
 3. The device should enumerate as a multi-touch HID digitizer
 
@@ -86,7 +86,7 @@ Once the firmware is running:
 
 ### 3. Test Touch Input
 
-- Send UART touch commands from the IFPD or test jig
+- Perform touch events on IFPD or test jig
 - Verify touch events are received by the target computer
 - Format: `TOUCH,x,y,cid,tip,pressure,inrange,confidence,width,height,azimuth,altitude,twist`
 

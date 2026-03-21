@@ -71,7 +71,7 @@ CONFIG_ESPTOOLPY_MONITOR_BAUD=2000000
 Choose one of the following methods:
 
 - **Command Palette**: `F1` → `ESP-IDF: Build your Project`
-- **Status Bar**: Click the build button (hammer icon)
+- **Status Bar**: Click the build button (spanner icon)
 - **Keyboard Shortcut**: `Ctrl+E` then `B`
 
 ### Clean Build
