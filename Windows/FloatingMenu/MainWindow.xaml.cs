@@ -345,7 +345,12 @@ namespace FloatingMenu
                 if (_touchProcess != null && !_touchProcess.HasExited)
                 {
                     _touchProcess.Kill();
-                    _touchProcess.WaitForExit();
+                    // Use a bounded wait to avoid blocking the UI thread indefinitely.
+                    const int waitTimeoutMilliseconds = 5000;
+                    if (!_touchProcess.WaitForExit(waitTimeoutMilliseconds))
+                    {
+                        Debug.WriteLine($"Timeout waiting for touch data capture process (PID {_touchProcess.Id}) to exit.");
+                    }
                 }
             }
             catch (Exception ex)
