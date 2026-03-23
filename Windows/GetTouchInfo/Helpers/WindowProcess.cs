@@ -300,24 +300,13 @@ namespace TouchDataCaptureService.Helpers
         }
 
         /// <summary>
-        /// ⚡ Checks if the touch point is on the PC Cast window (not the main InteractiveDisplayCapture window)
+        /// ⚡ Checks if the given window handle is the PC Cast window (not the main InteractiveDisplayCapture window)
         /// </summary>
-        public static bool IsTouchOnPCCastWindow(int x, int y, uint processId)
+        public static bool IsTouchOnPCCastWindow(IntPtr touchWindowHandle, uint processId)
         {
             lock (_pcCastLock)
             {
-                // Get the window handle at the touch point
-                POINT point = new POINT { X = x, Y = y };
-                IntPtr touchWindowHandle = WindowFromPoint(point);
-
                 if (touchWindowHandle == IntPtr.Zero)
-                {
-                    return false;
-                }
-
-                // Verify this window belongs to the expected process
-                GetWindowThreadProcessId(touchWindowHandle, out uint windowProcessId);
-                if (windowProcessId != processId)
                 {
                     return false;
                 }

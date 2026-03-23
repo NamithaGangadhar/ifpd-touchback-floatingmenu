@@ -47,7 +47,6 @@ namespace TouchDataCaptureService
         private static volatile bool _serialSenderThreadRunning = false;
         private static bool SendRawDataSerial = false;
         private static bool EnableSerialLogging = false; // Disabled by default
-        private static bool IsBypassEnabled = false;
 
         // UART Send Queue for decoupling
         private class SerialQueueItem
@@ -511,10 +510,6 @@ namespace TouchDataCaptureService
                     case "--USERAW":
                         SendRawDataSerial = true;
                         break;
-                    case "-ENABLEBYPASS":
-                    case "--ENABLEBYPASS":
-                        IsBypassEnabled = true;
-                        break;
                     case "-SERIALLOG":
                     case "--SERIALLOG":
                         EnableSerialLogging = true;
@@ -540,8 +535,6 @@ namespace TouchDataCaptureService
             PrintArgsDescription("--baudrate <Value>","Set serial baudrate (e.g., --baudrate 9600)");
             PrintArgsDescription("-useraw","Sends Raw data via serial. By default decoded data is being sent serially");
             PrintArgsDescription("--useraw","Sends Raw data via serial. By default decoded data is being sent serially");
-            PrintArgsDescription("-enablebypass", "If enabled, Touch events originating from Floating Menu and Annotation Tool are bypassed. Not enabled by default.");
-            PrintArgsDescription("--enablebypass", "If enabled, Touch events originating from Floating Menu and Annotation Tool are bypassed. Not enabled by default.");
             PrintArgsDescription("-seriallog", "Enable serial communication logging (disabled by default)");
             PrintArgsDescription("--seriallog", "Enable serial communication logging (disabled by default)");
             PrintArgsDescription("-h, --help", "Show this help message");
@@ -560,7 +553,6 @@ namespace TouchDataCaptureService
             Console.WriteLine("  TouchDataCaptureService.exe --port COM10");
             Console.WriteLine("  Pass multiple arguments as shown below: ");
             Console.WriteLine("     TouchDataCaptureService.exe --port COM4 --baudrate 9600 --useraw");
-            Console.WriteLine("     TouchDataCaptureService.exe -port COM4 -baudrate 9600 -enablebypass");
         }
 
         private static void PrintArgsDescription(string args, string explanation)
@@ -1208,7 +1200,7 @@ namespace TouchDataCaptureService
                                 windowInfo.ProcessName.Equals("FloatingMenu"))
                             {
                                 // Only send events if the touch is specifically on the PC Cast window
-                                if (WindowProcess.IsTouchOnPCCastWindow(screenX, screenY, windowInfo.ProcessId))
+                                if (WindowProcess.IsTouchOnPCCastWindow(windowInfo.WindowHandle, windowInfo.ProcessId))
                                 {
                                     // ✅ Send touch event - user touched PC Cast window
                                     if (!SendRawDataSerial)
@@ -1360,7 +1352,7 @@ namespace TouchDataCaptureService
                 }
                 
                 // Convert HID coordinates to screen coordinates for process detection
-                if (IsBypassEnabled && result.X >= 0 && result.Y >= 0)
+                if (result.X >= 0 && result.Y >= 0)
                 {
                     var (screenX, screenY) = WindowProcess.ConvertHidToScreenCoordinates(result.X, result.Y);
                     
