@@ -11,13 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="ViewModels\**" />
-    <EmbeddedResource Remove="ViewModels\**" />
-    <None Remove="ViewModels\**" />
-    <Page Remove="ViewModels\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Remove="Services\TouchDataCapture\TouchDataCaptureService.exe" />
   </ItemGroup>
 
