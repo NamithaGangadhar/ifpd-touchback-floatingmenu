@@ -264,14 +264,8 @@ namespace FloatingMenu
 
             try
             {
-                string port = Helpers.ReadJSON.GetPortFromExternalConfig();
-
-                string exePath = System.IO.Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory,
-                "Services", "TouchDataCapture",
-                "TouchDataCaptureService.exe"
-            );
-
+                var (port, exePath) = Helpers.ReadJSON.GetPortFromExternalConfig();
+              
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -291,9 +285,14 @@ namespace FloatingMenu
             catch (Exception ex)
             {
                 _touchProcess = null;
-                var ports = string.Join(", ", SerialPort.GetPortNames()); //
+                string[] portList = SerialPort.GetPortNames();
+
+                string portsMessage = portList.Length > 0
+                    ? string.Join(", ", portList)
+                    : "No COM ports available";
+
                 MessageBox.Show(
-                    $"Invalid port in config\n\nAvailable ports:\n{ports}.",
+                    $"Failed to start Touch Service:\n\n{ex.Message}\n\nAvailable ports:\n{portsMessage}",
                     "Configuration Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);

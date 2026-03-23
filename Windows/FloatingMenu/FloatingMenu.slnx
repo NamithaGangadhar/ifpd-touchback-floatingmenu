@@ -1,3 +1,7 @@
 <Solution>
+  <Folder Name="/ExternalTools/" />
+  <Folder Name="/ExternalTools/TouchDataCaptureService/">
+    <File Path="../ExternalTools/TouchDataCaptureService/TouchDataCaptureService.exe" />
+  </Folder>
   <Project Path="FloatingMenu.csproj" />
 </Solution>

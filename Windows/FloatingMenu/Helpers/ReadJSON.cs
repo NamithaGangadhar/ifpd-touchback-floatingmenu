@@ -12,7 +12,7 @@ namespace FloatingMenu.Helpers
 {
     internal static class ReadJSON
     {
-        public static string GetPortFromExternalConfig()
+        public static (string port, string exePath) GetPortFromExternalConfig()
         {
             string path = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory,
@@ -39,22 +39,36 @@ namespace FloatingMenu.Helpers
 
             if (string.IsNullOrWhiteSpace(config.Port))
                 throw new Exception("Port is missing in config");
+             
+            if (string.IsNullOrWhiteSpace(config.ServiceRelativePath))
+                throw new Exception("Service path missing");
 
             string port = config.Port.Trim().ToUpper();
+
+            if (!port.StartsWith("COM") || !int.TryParse(port.Substring(3), out _))
+                throw new Exception($"Invalid port format: {port}");
 
             var availablePorts = SerialPort.GetPortNames();
 
             if (!availablePorts.Contains(port))
                 throw new Exception($"Port '{port}' not found on this machine");
 
-            return port;
+            string exePath = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory,
+        config.ServiceRelativePath 
+    );
 
+            if (!File.Exists(exePath))
+                throw new Exception($"Service EXE not found:\n{exePath}");
+
+            return (port, exePath);
         }
 
     }
 
-    class ConfigModel
+    public class ConfigModel
     {
         public string Port { get; set; }
+        public string ServiceRelativePath { get; set; }
     }
 }

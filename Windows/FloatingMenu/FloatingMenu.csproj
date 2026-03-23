@@ -12,16 +12,13 @@
 
   <ItemGroup>
     <None Remove="config.json" />
-    <None Remove="Services\TouchDataCapture\TouchDataCaptureService.exe" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Services\TouchDataCapture\TouchDataCaptureService.exe">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+   
   </ItemGroup>
 
   <ItemGroup>
@@ -31,4 +28,21 @@
     <PackageReference Include="System.IO.Ports" Version="10.0.5" />
   </ItemGroup>
 
+	<Target Name="CopyExternalTools_Build" AfterTargets="Build">
+		<ItemGroup>
+			<ExternalFiles Include="$(ProjectDir)..\ExternalTools\**\*" />
+		</ItemGroup>
+
+		<Copy SourceFiles="@(ExternalFiles)"
+			  DestinationFolder="$(OutDir)ExternalTools\%(RecursiveDir)" />
+	</Target>
+
+	<Target Name="CopyExternalTools_Publish" AfterTargets="Publish">
+		<ItemGroup>
+			<ExternalFiles Include="$(ProjectDir)..\ExternalTools\**\*" />
+		</ItemGroup>
+
+		<Copy SourceFiles="@(ExternalFiles)"
+			  DestinationFolder="$(PublishDir)ExternalTools\%(RecursiveDir)" />
+	</Target>
 </Project>
