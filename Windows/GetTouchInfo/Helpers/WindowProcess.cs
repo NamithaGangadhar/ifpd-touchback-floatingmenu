@@ -176,33 +176,6 @@ namespace TouchDataCaptureService.Helpers
         }
 
         /// <summary>
-        /// ⚡ OPTIMIZED: Fast check using cached window handle
-        /// </summary>
-        public static bool IsSourceDeviceCasted(uint processId)
-        {
-            lock (_pcCastLock)
-            {
-                // Fast path: Check if cached handle is still valid
-                if (_pcCastWindowHandle != IntPtr.Zero && 
-                    _cachedProcessId == processId &&
-                    IsWindow(_pcCastWindowHandle) && 
-                    IsWindowVisible(_pcCastWindowHandle))
-                {
-                    return true;
-                }
-
-                // Slow path: Handle is invalid or process changed, re-scan
-                _pcCastWindowHandle = FindPCCastWindow(processId);
-                _cachedProcessId = processId;
-
-                bool isOpen = _pcCastWindowHandle != IntPtr.Zero;
-                Debug.WriteLine($"PC Cast window {(isOpen ? "FOUND" : "NOT FOUND")} for PID {processId} (Handle: {_pcCastWindowHandle:X8})");
-                
-                return isOpen;
-            }
-        }
-
-        /// <summary>
         /// Finds the PC Cast window handle for a given process
         /// </summary>
         private static IntPtr FindPCCastWindow(uint processId)
@@ -323,6 +296,53 @@ namespace TouchDataCaptureService.Helpers
             lock (_cacheLock)
             {
                 return ProcessInfoDict.Count;
+            }
+        }
+
+        /// <summary>
+        /// ⚡ Checks if the touch point is on the PC Cast window (not the main InteractiveDisplayCapture window)
+        /// </summary>
+        public static bool IsTouchOnPCCastWindow(int x, int y, uint processId)
+        {
+            lock (_pcCastLock)
+            {
+                // Get the window handle at the touch point
+                POINT point = new POINT { X = x, Y = y };
+                IntPtr touchWindowHandle = WindowFromPoint(point);
+
+                if (touchWindowHandle == IntPtr.Zero)
+                {
+                    return false;
+                }
+
+                // Verify this window belongs to the expected process
+                GetWindowThreadProcessId(touchWindowHandle, out uint windowProcessId);
+                if (windowProcessId != processId)
+                {
+                    return false;
+                }
+
+                // Check if cached PC Cast handle is still valid
+                if (_pcCastWindowHandle != IntPtr.Zero && 
+                    _cachedProcessId == processId &&
+                    IsWindow(_pcCastWindowHandle) && 
+                    IsWindowVisible(_pcCastWindowHandle))
+                {
+                    // Compare the touch window handle with the cached PC Cast window handle
+                    return touchWindowHandle == _pcCastWindowHandle;
+                }
+
+                // Cache invalid - re-scan for PC Cast window
+                _pcCastWindowHandle = FindPCCastWindow(processId);
+                _cachedProcessId = processId;
+
+                if (_pcCastWindowHandle == IntPtr.Zero)
+                {
+                    return false; // No PC Cast window found
+                }
+
+                // Check if the touch is on the newly found PC Cast window
+                return touchWindowHandle == _pcCastWindowHandle;
             }
         }
     }

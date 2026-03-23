@@ -480,7 +480,7 @@ namespace TouchDataCaptureService
         private static bool _detailedHeaderWritten = false;
         private static bool _serialHeaderWritten = false;
 
-        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "ScreenPaint" };
+        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "FloatingMenu", "ScreenPaint" };
         private static readonly Dictionary<IntPtr, Dictionary<string, (int min, int max)>> deviceLogicalRanges = new();
 
         private static void ProcessCommandLineArgs(string[] args)
@@ -1190,6 +1190,11 @@ namespace TouchDataCaptureService
                         if (decoded.IsValid)
                         {
                             var decodedLogString = (i != contactCount) ? $"[HID] {decoded.Summary}" : $"[HID] {decoded.Summary}\n";
+                            
+                            // In your touch event handler
+                            var (screenX, screenY) = WindowProcess.ConvertHidToScreenCoordinates(decoded.X, decoded.Y);
+                            var windowInfo = WindowProcess.GetProcessAtPoint(screenX, screenY);
+
                             LogDecoded(decodedLogString);
                             LogDetailed(decoded);
 
@@ -1199,12 +1204,20 @@ namespace TouchDataCaptureService
                                 if (!SendRawDataSerial)
                                     SendTouchDataViaSerial(decoded, header.hDevice);
                             }
-                            if (decoded.ProcessName.Equals("InteractiveDisplayCapture"))
+                            if (windowInfo.ProcessName.Equals("InteractiveDisplayCapture") ||
+                                windowInfo.ProcessName.Equals("FloatingMenu"))
                             {
-                                var isCasted = WindowProcess.IsSourceDeviceCasted(decoded.ProcessId);
-                                if (isCasted && !SendRawDataSerial)
+                                // Only send events if the touch is specifically on the PC Cast window
+                                if (WindowProcess.IsTouchOnPCCastWindow(screenX, screenY, windowInfo.ProcessId))
                                 {
-                                   SendTouchDataViaSerial(decoded, header.hDevice);
+                                    // ✅ Send touch event - user touched PC Cast window
+                                    if (!SendRawDataSerial)
+                                        SendTouchDataViaSerial(decoded, header.hDevice);
+                                }
+                                else
+                                {
+                                    // ❌ Don't send - user touched main window/side menu
+                                    Debug.WriteLine("Touch on main InteractiveDisplayCapture window - ignored");
                                 }
                             }
                         }
