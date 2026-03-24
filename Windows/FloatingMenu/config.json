@@ -1,4 +1,4 @@
 {
-  "Port": "COM1",
+  "Port": "COM3",
   "ServiceRelativePath": "ExternalTools\\TouchDataCaptureService\\TouchDataCaptureService.exe"
 }

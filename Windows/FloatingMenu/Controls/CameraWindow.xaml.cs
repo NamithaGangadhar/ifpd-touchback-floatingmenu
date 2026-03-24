@@ -2,11 +2,13 @@
 * Copyright (C) 2026 Intel Corporation
 * SPDX-License-Identifier: Apache-2.0
 *******************************************************************************/
-
+using AForge.Video;
+using AForge.Video.DirectShow;
 using OpenCvSharp;
-using OpenCvSharp.WpfExtensions;
 using System.Windows;
-using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using MessageBox = System.Windows.MessageBox;
 
 namespace FloatingMenu.Controls
@@ -20,6 +22,13 @@ namespace FloatingMenu.Controls
         private CancellationTokenSource _cameraTokenSource;
         private Task _cameraTask;
         public event Action CameraClosed;
+
+        private VideoCaptureDevice _videoSource;
+        private FilterInfoCollection _videoDevices;
+        private int _frameCounter = 0;
+
+
+
         public CameraWindow(int cameraIndex)
         {
             InitializeComponent();
@@ -33,63 +42,98 @@ namespace FloatingMenu.Controls
            
         }
 
-        private void StartCamera(int cameraIndex)
+        private void StartCamera(int cameraIndex = 0)
         {
-            _cameraTokenSource = new CancellationTokenSource();
-            var token = _cameraTokenSource.Token;
-
-            _capture = new VideoCapture(cameraIndex, VideoCaptureAPIs.DSHOW);
-
-            if (!_capture.IsOpened())
+            try
             {
-                MessageBox.Show("Camera failed to open!");
-                StopCamera();
-                return;
-            }
+                _videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
-            // Get primary screen resolution dynamically
-            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-
-            _capture.Set(VideoCaptureProperties.FrameWidth, screenWidth);
-            _capture.Set(VideoCaptureProperties.FrameHeight, screenHeight);
-
-            _capture.Set(VideoCaptureProperties.Fps, 60);
-            
-            _cameraTask = Task.Run(async () =>
-            {
-                using var frame = new Mat();
-
-                while (!token.IsCancellationRequested)
+                if (_videoDevices.Count == 0)
                 {
-                    _capture.Read(frame);
-
-                    if (!frame.Empty())
-                    {
-                        var image = frame.ToBitmapSource();
-                        image.Freeze();
-
-                        Dispatcher.BeginInvoke(() =>
-                        {
-                            CameraImage.Source = image;
-                        });
-                    }
-
-                    await Task.Delay(16);
+                    MessageBox.Show("No camera found");
+                    return;
                 }
-            }, token);
+
+                if (cameraIndex >= _videoDevices.Count)
+                {
+                    MessageBox.Show($"Invalid camera index. Found {_videoDevices.Count} devices.");
+                    return;
+                }
+
+                _videoSource = new VideoCaptureDevice(_videoDevices[cameraIndex].MonikerString);
+
+
+                VideoCapabilities best = _videoSource.VideoCapabilities
+                    .OrderByDescending(c => c.FrameSize.Width * c.FrameSize.Height)
+                    .First();
+
+                _videoSource.VideoResolution = best;
+
+                _videoSource.NewFrame += VideoSource_NewFrame;
+                _videoSource.Start();
+            }
+            catch(Exception e)
+            {
+                MessageBox.Show("PC Cast is not Enabled for the selected device.");
+                StopCamera();
+
+                Dispatcher.BeginInvoke(() =>
+                {
+                    CameraClosed?.Invoke();
+                    this.Close();
+                });
+            }
         }
+
+        private void VideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            try
+            {
+                
+                if (++_frameCounter % 2 != 0)
+                    return;
+
+                using (Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone())
+                {
+                    IntPtr hBitmap = bitmap.GetHbitmap();
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            var source = Imaging.CreateBitmapSourceFromHBitmap(
+                                hBitmap,
+                                IntPtr.Zero,
+                                Int32Rect.Empty,
+                                BitmapSizeOptions.FromEmptyOptions());
+
+                            CameraImage.Source = source;
+                        }
+                        finally
+                        {
+                            DeleteObject(hBitmap); 
+                        }
+                    }));
+                }
+            }
+            catch
+            {
+                
+            }
+        }
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        public static extern bool DeleteObject(IntPtr hObject);
 
         private void StopCamera()
         {
             try
             {
-                _cameraTokenSource?.Cancel();
-                _cameraTask?.Wait(300);
-
-                _capture?.Release();
-                _capture?.Dispose();
-                _capture = null;
+                if (_videoSource != null)
+                {
+                    _videoSource.SignalToStop();
+                    _videoSource.WaitForStop();
+                    _videoSource = null;
+                }
             }
             catch { }
         }

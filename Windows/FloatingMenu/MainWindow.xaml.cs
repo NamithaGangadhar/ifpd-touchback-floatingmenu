@@ -302,10 +302,14 @@ namespace FloatingMenu
 
         private void OnCameraClosed()
         {
-
             Dispatcher.Invoke(() =>
             {
-                _cameraWindow = null;
+                if (_cameraWindow != null)
+                {
+                    _cameraWindow.CameraClosed -= OnCameraClosed;
+                    _cameraWindow = null;
+                }
+
                 _menuOpen = false;
 
                 if (_signalSourcePage != null)
@@ -319,12 +323,17 @@ namespace FloatingMenu
                     }
                 }
 
-                ToggleMenu();
-                EdgeMenu.ClearSelection();
-                EdgeMenu.SelectMenuItem(2);
                 KillTouchDataCapture();
-                ShowFlyout(_signalSourcePage);
                 EdgeMenu.PCStatus.Text = "";
+                EdgeMenu.ClearSelection();
+
+                if (!_menuOpen)
+                {
+                    ToggleMenu();
+                }
+
+                EdgeMenu.SelectMenuItem(2);
+                ShowFlyout(_signalSourcePage);
             });
         }
 
