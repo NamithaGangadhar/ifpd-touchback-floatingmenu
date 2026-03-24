@@ -83,7 +83,7 @@ A WPF application providing an edge-docked floating menu for camera management a
 - **Cables**: USB data cables, UART connection (TX/RX)
 
 ### Software
-- **Windows 10/11** (for IFPD and Target Computer)
+- **Windows 11** (for IFPD and Target Computer)
 - **.NET 10 SDK** (for Windows applications)
 - **ESP-IDF v5.x** (for MCU firmware)
 - **Visual Studio 2022** or **Visual Studio Code** (optional)
@@ -144,6 +144,6 @@ Contributions are welcome! Please ensure:
 
 ## 📄 License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) file for details
+This project is licensed under the Apache License 2.0. See [Apache-2.0.txt](Apache-2.0.txt) file for details
 
 

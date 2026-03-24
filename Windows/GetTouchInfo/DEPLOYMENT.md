@@ -17,14 +17,14 @@ This guide covers building, publishing, and deploying the Touch Data Capture Ser
 
 ### Development Machine
 
-- **Windows 10/11** with latest updates
+- **Windows 11** with latest updates
 - **.NET 10 SDK** installed
 - **Git** for source control
 - **Visual Studio 2022** or **VS Code** (optional)
 
 ### Target Machine
 
-- **Windows 10** (build 19041+) or **Windows 11**
+- **Windows 11**
 - **.NET 10 Runtime** (for framework-dependent deployment)
 - **Administrator privileges** for installation
 - **HID-compliant touch screen** available 
@@ -184,12 +184,13 @@ Choose your transfer method:
 
 * Create installation directory
 	```
-	$installPath = "C:\Program Files\TouchDataCaptureService" New-Item -Path $installPath -ItemType Directory -Force
+	$installPath = "C:\Program Files\TouchDataCaptureService"
+	New-Item -Path $installPath -ItemType Directory -Force
 	```
 
 * Copy files from deployment package
 	```
-	Copy-Item -Path "E:\TouchDataCaptureService*" -Destination $installPath -Recurse
+	Copy-Item -Path "E:\TouchDataCaptureService\*" -Destination $installPath -Recurse
 	```
 
 * Or extract from ZIP
@@ -421,12 +422,13 @@ Save as `StartTouchService.bat` in the installation directory.
 
 - Copy new version
 	```
-	Copy-Item -Path "C:\Temp\TouchDataCaptureService_NewVersion*" -Destination $installPath -Recurse -Force
+	Copy-Item -Path "C:\Temp\TouchDataCaptureService_NewVersion\*" -Destination $installPath -Recurse -Force
 	```
 
 - Verify new version
 	```
-	cd $installPath .\TouchDataCaptureService.exe --help
+	cd $installPath
+	.\TouchDataCaptureService.exe --help
 	```
 
 ## 🗑️ Uninstalling
@@ -470,7 +472,7 @@ Use this checklist for each deployment:
 - [ ] Deployment package created (folder or ZIP)
 
 ### Target Machine Setup
-- [ ] Windows 10/11 verified
+- [ ] Windows 11 verified
 - [ ] .NET 10 runtime installed (if using FDD)
 - [ ] Touch screen device working
 - [ ] Serial port identified and available

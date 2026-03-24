@@ -34,7 +34,7 @@ Touch Screen (HID) → Raw Input API → Touch Decoder → Serial Queue → Seri
 
 ### Project Structure
 ```
-TouchDataCaptureService/ 
+./ 
 ├── Program.cs              # Main application and HID processing 
 ├── Helpers/ 
 │   └── WindowProcess.cs    # Window and process detection utilities 
@@ -44,8 +44,8 @@ TouchDataCaptureService/
 └── bin/ 
 	└── Release/ 
 		└── net10.0/        # Build output
-			└──publish/ 
-				└── winx-64
+			└── win-x64/
+				└── publish/
 					└── TouchDataCaptureService.exe  # Published executable
 ```
 
@@ -78,7 +78,7 @@ TouchDataCaptureService/
 ## 💻 System Requirements
 
 ### Hardware
-- **Operating System**: Windows 10 (build 19041+) or Windows 11
+- **Operating System**: Windows 11
 - **Touch Screen**: HID-compliant touch device
 - **Serial Port**: Physical COM port, USB-to-Serial adapter, or virtual COM port
 - **Disk Space**: Minimum 100 MB (for application and logs)
@@ -107,10 +107,10 @@ TouchDataCaptureService/
 2. **Download or Build the Application**
 
 	- Clone repository
-		```
-		git clone https://github.com/intel-sandbox/ifpd-touchback-floatingmenu.git
-		cd ifpd-touchback-floatingmenu
-		```
+	```
+	git clone https://github.com/intel-sandbox/ifpd-touchback-floatingmenu.git
+	cd ifpd-touchback-floatingmenu
+	```
 	- Build Release version
 		```
 		dotnet build -c Release
@@ -478,7 +478,7 @@ This is an internal Intel project. For contributions or issues:
 **Copyright (C) 2026 Intel Corporation**  
 **SPDX-License-Identifier: Apache-2.0**
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) file for details.
+Licensed under the Apache License, Version 2.0. See [Apache-2.0.txt](../../Apache-2.0.txt) file for details.
 
 ## 📚 Additional Resources
 
@@ -494,5 +494,5 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) file for 
 - **Last Updated**: March 2026
 - **Target Framework**: .NET 10
 - **C# Version**: 14.0
-- **Platform**: Windows 10/11 (x64)
+- **Platform**: Windows 11 (x64)
 

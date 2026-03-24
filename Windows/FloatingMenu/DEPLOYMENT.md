@@ -18,7 +18,7 @@ This guide covers building, publishing, and deploying the Floating Menu Applicat
 
 ### Development Machine
 
-- **Windows 10/11** with latest updates
+- **Windows 11** with latest updates
 - **.NET 10 SDK** installed
 - **Git** for source control
 - **Visual Studio 2022** or **Visual Studio 2026** (recommended)
@@ -26,7 +26,7 @@ This guide covers building, publishing, and deploying the Floating Menu Applicat
 
 ### Target Machine
 
-- **Windows 10** (build 19041+) or **Windows 11**
+- **Windows 11**
 - **.NET 10 Runtime** (for framework-dependent deployment) or **.NET 10 Desktop Runtime**
 - **DirectShow-compatible camera** (USB webcam, document camera, etc.)
 - **Display**: Interactive flat panel display or standard monitor
@@ -149,7 +149,8 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=tru
 	```
 * Create deployment folder:
 	```
-	$deployPath = "C:\Temp\FloatingMenu_Deployment" New-Item -Path $deployPath -ItemType Directory -Force
+	$deployPath = "C:\Temp\FloatingMenu_Deployment"
+	New-Item -Path $deployPath -ItemType Directory -Force
 	```
 * Copy all files:
 	```
@@ -157,7 +158,8 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=tru
 	```
 * Optional: Create ZIP for distribution:
 	```
-	Compress-Archive -Path "$deployPath*" -DestinationPath "$deployPath..\FloatingMenu.zip"
+	$zipPath = Join-Path (Split-Path $deployPath -Parent) 'FloatingMenu.zip'
+	Compress-Archive -Path "$deployPath\*" -DestinationPath $zipPath
 	```
 ### Step 2: Transfer to Target Machine
 
@@ -177,11 +179,12 @@ Choose your transfer method:
 
 * Create installation directory:
 	```
-	$installPath = "C:\Program Files\FloatingMenu" New-Item -Path $installPath -ItemType Directory -Force
+	$installPath = "C:\Program Files\FloatingMenu"
+	New-Item -Path $installPath -ItemType Directory -Force
 	```
 * Copy files from deployment package:
 	```	
-	Copy-Item -Path "E:\FloatingMenu*" -Destination $installPath -Recurse
+	Copy-Item -Path "E:\FloatingMenu\*" -Destination $installPath -Recurse
 	```
 * Or extract from ZIP:
 	```
@@ -573,7 +576,7 @@ Use this checklist for each deployment:
 - [ ] Deployment package created (folder or ZIP)
 
 ### Target Machine Setup
-- [ ] Windows 10/11 verified (build 19041+)
+- [ ] Windows 11 verified
 - [ ] .NET 10 Desktop Runtime installed (if using FDD)
 - [ ] Camera device connected and working
 - [ ] Camera drivers installed and up to date

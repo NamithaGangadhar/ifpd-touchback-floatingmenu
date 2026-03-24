@@ -109,7 +109,7 @@ FloatingMenu/
 ## 💻 System Requirements
 
 ### Hardware
-- **Operating System**: Windows 10 (build 19041+) or Windows 11
+- **Operating System**: Windows 11
 - **Display**: Interactive flat panel display or standard monitor
 - **Camera**: USB camera(s) compatible with DirectShow (DSHOW)
 - **RAM**: Minimum 4 GB (8 GB recommended for HD camera feeds)
@@ -153,7 +153,7 @@ FloatingMenu/
 
 	- Navigate to build output:
 		```
-		cd bin\Release\net10.0
+		cd bin\Release\net10.0-windows
 		```
 	- Launch application:
 		```
@@ -163,9 +163,9 @@ FloatingMenu/
 ### First Run
 
 1. **Application starts** with a thin edge handle on the right side of the screen
-2. **Click theedge handle** to expand the menu
+2. **Click the edge handle** to expand the menu
 3. **Select "Signal Source"** to view available cameras
-4. **Click a camera** from the list to openfull-screen preview
+4. **Click a camera** from the list to open full-screen preview
 5. **Drag the edge handle** vertically to reposition as needed
 
 ## ⚙️ Configuration
@@ -176,7 +176,7 @@ FloatingMenu/
 - **Collapsed Size**: 3.5% screen width × 25% screen height
 - **Expanded Size**: 18% screen width × 45% screen height
 - **Camera Frame Rate**: 60 FPS
-- **Camera Resolution**: Matches primary screenresolution
+- **Camera Resolution**: Matches primary screen resolution
 - **Video Capture API**: DirectShow (DSHOW)
 
 ### Customization
@@ -565,7 +565,7 @@ This is an internal Intel project. For contributions or issues:
 **Copyright (C) 2026 Intel Corporation**  
 **SPDX-License-Identifier: Apache-2.0**
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) file for details.
+Licensed under the Apache License, Version 2.0. See [Apache-2.0.txt](../../Apache-2.0.txt) file for details.
 
 ## 📚 Additional Resources
 
@@ -582,5 +582,5 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) file for 
 - **Last Updated**: March 2026
 - **Target Framework**: .NET 10
 - **C# Version**: 14.0
-- **Platform**: Windows 10/11 (x64)
+- **Platform**: Windows 11 (x64)
 - **UI Framework**: WPF (Windows Presentation Foundation)
