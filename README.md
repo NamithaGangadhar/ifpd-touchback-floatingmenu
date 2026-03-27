@@ -15,7 +15,6 @@ A complete solution to enable reverse touch / touch-back functionality for Inter
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
 - [Use Cases](#use-cases)
-- [Contributing](#contributing)
 - [License](#license)
 
 ## 🔍 Overview
@@ -25,6 +24,8 @@ This project enables touch input from an IFPD to be transferred to a connected c
 1. **Touch Data Capture Service** (Windows) - Captures touch input from the IFPD
 2. **MCU Firmware** (ESP32-S3) - Acts as a bridge, receiving touch data via UART and presenting it as USB HID
 3. **Floating Menu Application** (Windows) - Provides a user-friendly interface for camera management and screen annotation
+
+**Note:** All three components are designed to work independently. You can use the Touch Data Capture Service standalone or integrate it with the Floating Menu Application based on your requirements.
 
 ## 🏗️ Architecture
 
@@ -67,7 +68,7 @@ A WPF application providing an edge-docked floating menu for camera management a
 
 **Features:**
 - Edge-docked collapsible UI
-- Camera detection and preview (OpenCV)
+- Camera detection and preview (Aforge.NET)
 - Signal source management
 - Screen annotation integration
 - Always-on-top interface
@@ -86,11 +87,18 @@ A WPF application providing an edge-docked floating menu for camera management a
 - **Windows 11** (for IFPD and Target Computer)
 - **.NET 10 SDK** (for Windows applications)
 - **ESP-IDF v5.x** (for MCU firmware)
-- **Visual Studio 2022** or **Visual Studio Code** (optional)
+- **Visual Studio 2022 or higher** or **Visual Studio Code** (optional)
 
 ## 🚀 Quick Start
 
-### 1. Setup MCU Firmware
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/<your-organization>/ifpd-touchback-floatingmenu.git
+cd ifpd-touchback-floatingmenu
+```
+
+### 2. Setup MCU Firmware
 
 ```bash
 cd MCU
@@ -98,7 +106,7 @@ cd MCU
 # Follow DEPLOYMENT.md for flashing
 ```
 
-### 2. Build Windows Applications
+### 3. Build Windows Applications
 
 ```bash
 cd Windows/GetTouchInfo
@@ -110,13 +118,29 @@ dotnet build
 dotnet publish -c Release
 ```
 
-### 3. Deploy and Run
+### 4. Deploy and Run
 
+#### Hardware Setup
 1. Flash the ESP32-S3 with the MCU firmware
 2. Connect ESP32-S3 UART to IFPD's serial port
-3. Run Touch Data Capture Service on the IFPD
-4. Connect ESP32-S3 USB to Target Computer
-5. Launch Floating Menu Application on the IFPD
+3. Connect ESP32-S3 USB to Target Computer
+
+#### Running the Application
+
+**Option 1: Touch Back Only (Standalone)**
+
+If you only need touch-back functionality without the floating menu:
+- Run the Touch Data Capture Service (TouchDataCaptureService.exe) directly on the IFPD
+- Touch events will be forwarded to the Target Computer via ESP32-S3
+
+**Option 2: With Floating Menu Integration**
+
+For full functionality including camera management and screen annotation:
+1. Configure the COM port in the Floating Menu configuration file
+2. Launch the Floating Menu Application on the IFPD
+3. The application will automatically manage the Touch Data Capture Service
+4. Click on the signal source button to start touch forwarding
+5. Click the source button again to stop the touch service
 
 ## 📚 Documentation
 
@@ -134,13 +158,6 @@ Each component has detailed documentation in its respective directory:
 - **Remote Control**: Use IFPD as a large touch interface for a connected computer
 - **Collaborative Work**: Share touch input across multiple devices
 - **Interactive Displays**: Enable touch-back for IA-only IFPD systems
-
-## 🤝 Contributing
-
-Contributions are welcome! Please ensure:
-- Code follows existing style conventions
-- All components build without errors
-- Documentation is updated accordingly
 
 ## 📄 License
 
