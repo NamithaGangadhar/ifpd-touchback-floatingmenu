@@ -11,14 +11,56 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260302" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260302" />
-    <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.13.0.20260302" />
+    <None Remove="config.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Services\" />
-    <Folder Include="ViewModels\" />
+    <Content Include="config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+   
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AForge" Version="2.2.5" />
+    <PackageReference Include="AForge.Video" Version="2.2.5" />
+    <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260302" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260302" />
+    <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.13.0.20260302" />
+    <PackageReference Include="System.IO.Ports" Version="10.0.5" />
+  </ItemGroup>
+
+	<!-- Custom target to publish and copy GetTouchInfo -->
+	<Target Name="PublishAndCopyGetTouchInfo" AfterTargets="Build">
+
+		<Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\GetTouchInfo\TouchDataCaptureService.csproj&quot; -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o &quot;$(MSBuildThisFileDirectory)..\GetTouchInfo\bin\Release\Publish&quot;" />
+
+		<Message Text="Published TouchDataCaptureService.exe to $(MSBuildThisFileDirectory)..\GetTouchInfo\bin\Release\Publish" Importance="high" />
+
+		<MakeDir Directories="$(MSBuildThisFileDirectory)..\ExternalTools\TouchDataCaptureService" />
+
+		<Copy SourceFiles="$(MSBuildThisFileDirectory)..\GetTouchInfo\bin\Release\Publish\TouchDataCaptureService.exe"
+			  DestinationFolder="$(MSBuildThisFileDirectory)..\ExternalTools\TouchDataCaptureService"
+			  SkipUnchangedFiles="true" />
+
+		<Message Text="Copied TouchDataCaptureService.exe to $(MSBuildThisFileDirectory)..\ExternalTools\TouchDataCaptureService" Importance="high" />
+
+	</Target>
+
+	<Target Name="CopyExternalTools_Build" AfterTargets="Build">
+		<ItemGroup>
+			<ExternalFiles Include="$(ProjectDir)..\ExternalTools\**\*" />
+		</ItemGroup>
+
+		<Copy SourceFiles="@(ExternalFiles)" DestinationFolder="$(OutDir)ExternalTools\%(RecursiveDir)" />
+	</Target>
+
+	<Target Name="CopyExternalTools_Publish" AfterTargets="Publish">
+		<ItemGroup>
+			<ExternalFiles Include="$(ProjectDir)..\ExternalTools\**\*" />
+		</ItemGroup>
+
+		<Copy SourceFiles="@(ExternalFiles)" DestinationFolder="$(PublishDir)ExternalTools\%(RecursiveDir)" />
+	</Target>
 </Project>

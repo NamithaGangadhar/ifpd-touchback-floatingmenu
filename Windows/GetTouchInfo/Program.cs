@@ -36,7 +36,6 @@ namespace TouchDataCaptureService
         private static volatile bool _serialSenderThreadRunning = false;
         private static bool SendRawDataSerial = false;
         private static bool EnableSerialLogging = false; // Disabled by default
-        private static bool IsBypassEnabled = false;
 
         // UART Send Queue for decoupling
         private class SerialQueueItem
@@ -469,7 +468,7 @@ namespace TouchDataCaptureService
         private static bool _detailedHeaderWritten = false;
         private static bool _serialHeaderWritten = false;
 
-        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "ScreenPaint" };
+        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "FloatingMenu", "ScreenPaint" };
         private static readonly Dictionary<IntPtr, Dictionary<string, (int min, int max)>> deviceLogicalRanges = new();
 
         private static void ProcessCommandLineArgs(string[] args)
@@ -500,10 +499,6 @@ namespace TouchDataCaptureService
                     case "--USERAW":
                         SendRawDataSerial = true;
                         break;
-                    case "-ENABLEBYPASS":
-                    case "--ENABLEBYPASS":
-                        IsBypassEnabled = true;
-                        break;
                     case "-SERIALLOG":
                     case "--SERIALLOG":
                         EnableSerialLogging = true;
@@ -529,8 +524,6 @@ namespace TouchDataCaptureService
             PrintArgsDescription("--baudrate <Value>","Set serial baudrate (e.g., --baudrate 9600)");
             PrintArgsDescription("-useraw","Sends Raw data via serial. By default decoded data is being sent serially");
             PrintArgsDescription("--useraw","Sends Raw data via serial. By default decoded data is being sent serially");
-            PrintArgsDescription("-enablebypass", "If enabled, Touch events originating from Floating Menu and Annotation Tool are bypassed. Not enabled by default.");
-            PrintArgsDescription("--enablebypass", "If enabled, Touch events originating from Floating Menu and Annotation Tool are bypassed. Not enabled by default.");
             PrintArgsDescription("-seriallog", "Enable serial communication logging (disabled by default)");
             PrintArgsDescription("--seriallog", "Enable serial communication logging (disabled by default)");
             PrintArgsDescription("-h, --help", "Show this help message");
@@ -549,7 +542,6 @@ namespace TouchDataCaptureService
             Console.WriteLine("  TouchDataCaptureService.exe --port COM10");
             Console.WriteLine("  Pass multiple arguments as shown below: ");
             Console.WriteLine("     TouchDataCaptureService.exe --port COM4 --baudrate 9600 --useraw");
-            Console.WriteLine("     TouchDataCaptureService.exe -port COM4 -baudrate 9600 -enablebypass");
         }
 
         private static void PrintArgsDescription(string args, string explanation)
@@ -580,16 +572,6 @@ namespace TouchDataCaptureService
                 Console.ReadKey();
                 FreeConsole();
                 return;
-            }
-
-            // For debugging arguments (remove in production)
-            if (args.Length > 0)
-            {
-                AllocConsole();
-                Console.WriteLine($"Arguments received: {string.Join(", ", args)}");
-                Console.WriteLine("Press any key to continue...");
-                Console.ReadKey();
-                FreeConsole();
             }
 
             // Process command line arguments (overrides config file)
@@ -1176,17 +1158,37 @@ namespace TouchDataCaptureService
                     for (ushort i = 1; i <= contactCount; i++)
                     {
                         var decoded = DecodeHIDReport(header.hDevice, dataPtr, (uint)bytes, i);
-                        if (decoded.IsValid && !SkipProcesses.Contains(decoded.ProcessName))
+                        if (decoded.IsValid)
                         {
                             var decodedLogString = (i != contactCount) ? $"[HID] {decoded.Summary}" : $"[HID] {decoded.Summary}\n";
                             LogDecoded(decodedLogString);
                             LogDetailed(decoded);
 
-                            // Send touch data via serial
-                            if (!SendRawDataSerial)
-                                SendTouchDataViaSerial(decoded, header.hDevice);
+                            if (!SkipProcesses.Contains(decoded.ProcessName))
+                            {
+                                // Send touch data via serial
+                                if (!SendRawDataSerial)
+                                    SendTouchDataViaSerial(decoded, header.hDevice);
+                            }
+                            // Centralized list of PC-cast-capable processes used for special handling
+                            string[] pcCastCapableProcesses = { "InteractiveDisplayCapture", "FloatingMenu" };
+                            if (Array.IndexOf(pcCastCapableProcesses, decoded.ProcessName) >= 0)
+                            {
+                                // Only send events if the touch is specifically on the PC Cast window
+                                if (WindowProcess.IsTouchOnPCCastWindow(decoded.WindowHandle, decoded.ProcessId))
+                                {
+                                    // ✅ Send touch event - user touched PC Cast window
+                                    if (!SendRawDataSerial)
+                                        SendTouchDataViaSerial(decoded, header.hDevice);
+                                }
+                                else
+                                {
+                                    // ❌ Don't send - user touched main window/side menu
+                                    Debug.WriteLine($"Touch on main {decoded.ProcessName} window - ignored");
+                                }
+                            }
                         }
-                        if(!decoded.IsValid)
+                        else
                         {
                             // Fallback to basic decoding
                             string? fallback = DecodeTouchReportFallback(report);
@@ -1325,7 +1327,7 @@ namespace TouchDataCaptureService
                 }
                 
                 // Convert HID coordinates to screen coordinates for process detection
-                if (IsBypassEnabled && result.X >= 0 && result.Y >= 0)
+                if (result.X >= 0 && result.Y >= 0)
                 {
                     var (screenX, screenY) = WindowProcess.ConvertHidToScreenCoordinates(result.X, result.Y);
                     

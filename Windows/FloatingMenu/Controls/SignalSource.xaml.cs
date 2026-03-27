@@ -167,17 +167,5 @@ namespace FloatingMenu.Controls
             }
         }
 
-        public string UpdateDevice()
-        {
-            if (device.Status == DeviceStatusEnum.Connected)
-            {
-                return device.Name;
-            }
-            else if (device.Status != DeviceStatusEnum.Connected)
-            {
-                return string.Empty;
-            }
-            return string.Empty;
-        }
     }
 }

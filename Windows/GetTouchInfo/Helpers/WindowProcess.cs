@@ -37,8 +37,20 @@ namespace TouchDataCaptureService.Helpers
         [DllImport("user32.dll")]
         private static extern bool IsWindow(IntPtr hWnd);
 
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
         private const int SM_CXSCREEN = 0;  // Screen width
         private const int SM_CYSCREEN = 1;  // Screen height
+        private const uint GA_ROOT = 2;  // Get root window
 
         private static int screenWidth = 0;
         private static int screenHeight = 0;
@@ -51,7 +63,13 @@ namespace TouchDataCaptureService.Helpers
         private static readonly Dictionary<uint, string> ProcessInfoDict = new Dictionary<uint, string>();
         private static readonly object _cacheLock = new object();
 
+        // ⚡ PC Cast window handle cache
+        private static readonly object _pcCastLock = new object();
+        private static IntPtr _pcCastWindowHandle = IntPtr.Zero;
+        private static uint _cachedProcessId = 0;
+
         private static WindowProcessInfo currentWindowProcessInfo = new WindowProcessInfo("Unknown", 0, IntPtr.Zero, "Unknown");
+        private static string PCCastWindowTitle = "PC Cast";
 
         public static void InitializeScreenMetrics(int _logicalMinX, int _logicalMaxX, int _logicalMinY, int _logicalMaxY)
         {
@@ -152,6 +170,61 @@ namespace TouchDataCaptureService.Helpers
         }
 
         /// <summary>
+        /// Gets the root (top-level) window handle from any window handle (including child windows)
+        /// </summary>
+        private static IntPtr GetRootWindow(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero)
+                return IntPtr.Zero;
+
+            IntPtr root = GetAncestor(hWnd, GA_ROOT);
+            return root != IntPtr.Zero ? root : hWnd;
+        }
+
+        /// <summary>
+        /// Finds the PC Cast window handle for a given process
+        /// </summary>
+        private static IntPtr FindPCCastWindow(uint processId)
+        {
+            IntPtr foundHandle = IntPtr.Zero;
+
+            EnumWindows((hWnd, lParam) =>
+            {
+                GetWindowThreadProcessId(hWnd, out uint windowProcessId);
+
+                if (windowProcessId == processId && IsWindowVisible(hWnd))
+                {
+                    StringBuilder title = new StringBuilder(256);
+                    int length = GetWindowText(hWnd, title, title.Capacity);
+                    string windowTitle = length > 0 ? title.ToString() : "";
+
+                    if (windowTitle.Contains(PCCastWindowTitle, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foundHandle = hWnd;
+                        return false; // Stop enumeration
+                    }
+                }
+
+                return true; // Continue enumeration
+            }, IntPtr.Zero);
+
+            return foundHandle;
+        }
+
+        /// <summary>
+        /// Manually invalidate the cached PC Cast window handle (optional)
+        /// </summary>
+        public static void InvalidatePCCastCache()
+        {
+            lock (_pcCastLock)
+            {
+                _pcCastWindowHandle = IntPtr.Zero;
+                _cachedProcessId = 0;
+                Debug.WriteLine("PC Cast cache invalidated");
+            }
+        }
+
+        /// <summary>
         /// Gets process name from cache if available, otherwise fetches and caches it
         /// </summary>
         private static string GetProcessNameCached(uint processId)
@@ -230,6 +303,83 @@ namespace TouchDataCaptureService.Helpers
             {
                 return ProcessInfoDict.Count;
             }
+        }
+
+        /// <summary>
+        /// ⚡ Checks if the given window handle is the PC Cast window (not the main InteractiveDisplayCapture window)
+        /// Handles both top-level and child window handles by normalizing to root window
+        /// </summary>
+        public static bool IsTouchOnPCCastWindow(IntPtr touchWindowHandle, uint processId)
+        {
+            IntPtr cachedPCCastWindowHandle = IntPtr.Zero;
+            uint cachedProcessId = 0;
+
+            lock (_pcCastLock)
+            {
+                // Snapshot cached values under lock, then release the lock before any expensive work.
+                cachedPCCastWindowHandle = _pcCastWindowHandle;
+                cachedProcessId = _cachedProcessId;
+            }
+
+            if (touchWindowHandle == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            // Normalize touch window handle to its root window
+            IntPtr rootWindowHandle = GetRootWindow(touchWindowHandle);
+            bool isMatch = false;
+
+            // Fast path: use cached PC Cast handle snapshot if still valid
+            if (cachedPCCastWindowHandle != IntPtr.Zero &&
+                cachedProcessId == processId &&
+                IsWindow(cachedPCCastWindowHandle) &&
+                IsWindowVisible(cachedPCCastWindowHandle))
+            {
+                // Compare root windows instead of direct handles
+                // This ensures child controls (buttons, text boxes, etc.) are properly detected
+                isMatch = rootWindowHandle == cachedPCCastWindowHandle;
+                if (isMatch)
+                {
+                    Debug.WriteLine($"Touch on PC Cast window detected (Root: {rootWindowHandle:X8}, Touch: {touchWindowHandle:X8})");
+                }
+                return isMatch;
+            }
+
+            // Cache invalid or no match - re-scan for PC Cast window outside the lock
+            IntPtr newPCCastWindowHandle = FindPCCastWindow(processId);
+            if (newPCCastWindowHandle == IntPtr.Zero)
+            {
+                return false; // No PC Cast window found
+            }
+
+            // Update the shared cache under lock using a double-checked pattern
+            lock (_pcCastLock)
+            {
+                if (_pcCastWindowHandle == IntPtr.Zero ||
+                    _cachedProcessId != processId ||
+                    !IsWindow(_pcCastWindowHandle) ||
+                    !IsWindowVisible(_pcCastWindowHandle))
+                {
+                    _pcCastWindowHandle = newPCCastWindowHandle;
+                    _cachedProcessId = processId;
+                }
+                // Refresh local snapshot from the (possibly) updated cache
+                cachedPCCastWindowHandle = _pcCastWindowHandle;
+            }
+
+            if (cachedPCCastWindowHandle == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            // Check if the touch is on the (now) cached PC Cast window
+            isMatch = rootWindowHandle == cachedPCCastWindowHandle;
+            if (isMatch)
+            {
+                Debug.WriteLine($"Touch on PC Cast window detected (Root: {rootWindowHandle:X8}, Touch: {touchWindowHandle:X8})");
+            }
+            return isMatch;
         }
     }
 
