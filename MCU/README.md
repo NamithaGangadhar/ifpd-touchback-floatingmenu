@@ -1,106 +1,83 @@
-# MCU SW
+# MCU Software - ESP32-S3 USB HID Touch Device
 
-This software runs on an MCU which receives touch data from IFPD and projects as USB HID touch screen (Digitizer).
+This firmware runs on an ESP32-S3 microcontroller, receiving touch data from an IFPD (Interactive Flat Panel Display) over UART and presenting it to a connected computer as a USB HID multi-touch digitizer.
 
-## Requirements
+## Architecture
 
-- ESP-IDF v5.x or later
-- VSCode with ESP-IDF extension
-- ESP32-S3 development board
+IFPD (Laptop 1) ──UART 3Mbaud──> ESP32-S3 ──USB HID──> Target Computer (Laptop 2)
+MCU
 
-## Opening the Project in VSCode
+## Features
 
-1. **Install ESP-IDF Extension**
-   - Open VSCode
-   - Go to Extensions (Ctrl+Shift+X)
-   - Search for "ESP-IDF" and install the official extension by Espressif
+- **USB HID Digitizer**: 10-finger multi-touch support
+- **Gesture Support**: Supports touch gestures
+- **High-speed UART**: 3 Mbaud input from IFPD
+- **Low latency**: Optimized dual-task architecture
+- **Standards compliant**: Windows Precision Touchpad compatible
 
-2. **Open the Project**
-   - File → Open Folder
-   - Navigate to and select the `MCU` folder
-   - VSCode will recognize it as an ESP-IDF project
+## Documentation
 
-3. **Configure ESP-IDF Extension**
-   - Press `F1` or `Ctrl+Shift+P` to open the command palette
-   - Run: `ESP-IDF: Configure ESP-IDF Extension`
-   - Select your ESP-IDF installation path
+📖 **[SETUP.md](SETUP.md)** - Development environment setup and build instructions
 
-## Configuration
+🚀 **[DEPLOYMENT.md](DEPLOYMENT.md)** - Flashing firmware and deployment guide
 
-### Initial Configuration
+## Quick Start
 
-1. **Open ESP-IDF Configuration UI**
-   - Press `F1` or `Ctrl+Shift+P`
-   - Run: `ESP-IDF: SDK Configuration Editor (Menuconfig)`
-   
-2. **Configure Required Settings**
+### For Developers
 
-   Navigate through the menuconfig UI to set these options:
-   
-   **TinyUSB HID Configuration:**
-   - Component config → TinyUSB Stack → Human Interface Device Class (HID)
-   - Set `CONFIG_TINYUSB_HID_COUNT` = `1`
-   
-   **Serial Monitor Baud Rate:**
-   - Serial flasher config
-   - Set `CONFIG_ESPTOOLPY_MONITOR_BAUD` = `2000000`
-   
-3. **Save Configuration**
-   - Press `S` to save
-   - Press `Q` to quit menuconfig
+1. Follow [SETUP.md](SETUP.md) to configure your environment
+2. Build the project
+3. Follow [DEPLOYMENT.md](DEPLOYMENT.md) to flash and test
 
-### Alternative: Manual Configuration
+### For Production
 
-You can also edit `sdkconfig` directly and add:
-- CONFIG_TINYUSB_HID_COUNT=1
-- CONFIG_ESPTOOLPY_MONITOR_BAUD=2000000
+See the "Production Deployment" section in [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Building the Project
+## Hardware Requirements
 
-1. **Full Build**
-   - Press `F1` or `Ctrl+Shift+P`
-   - Run: `ESP-IDF: Build your Project`
-   - Or use the build button in the bottom status bar
-   - Or press `Ctrl+E` then `B`
+- ESP32-S3 development board (with USB-OTG support)
+- USB cable (data-capable)
+- UART connection from IFPD (3 Mbaud, 8N1)
 
-2. **Clean Build** (if needed)
-   - Press `F1` or `Ctrl+Shift+P`
-   - Run: `ESP-IDF: Full Clean`
-   - Then rebuild the project
+**Important:** The baud rate configured in this firmware must match the baud rate in the Touch Data Capture Service. The maximum supported baud rate is 3,000,000 (3 Mbaud). Exceeding this limit may cause exceptions during serial communication.
 
-### Generated Files
+## Project Structure
 
-During build time, the following files are automatically generated in the `build/` directory:
-- `build/config/sdkconfig.h` - C header with configuration defines
-- `build/config/sdkconfig.cmake` - CMake configuration
-- `build/compile_commands.json` - Compilation database for IntelliSense
-- `build/project_description.json` - Project metadata
-- Bootloader binaries in `build/bootloader/`
+```
+MCU/
+├── main/
+│ ├── app_main.c # Main application and UART handling
+│ ├── hid_touch.c # HID touch descriptor and reporting
+│ └── hid_touch.h
+├── managed_components/ # ESP-IDF managed dependencies
+├── CMakeLists.txt # Project CMake configuration
+├── sdkconfig # ESP-IDF configuration
+└── README.md # This file
+```
 
-These files should NOT be manually edited as they are regenerated on each build.
+## Technical Details
 
-## Flashing and Monitoring
+- **UART Protocol**: Custom CSV format with 13 fields per contact
+- **HID Range**: 0-32767 logical units (auto-mapped by Windows)
+- **CPU Affinity**: UART task on CPU1, USB task on CPU0
+- **Queue Size**: 64 lines (handles burst traffic)
 
-1. **Flash to Device**
-   - Connect your ESP32-S3 board via USB
-   - Press `F1` or `Ctrl+Shift+P`
-   - Run: `ESP-IDF: Flash your Project`
-   - Or press `Ctrl+E` then `F`
+## Support
 
-2. **Monitor Output**
-   - Press `F1` or `Ctrl+Shift+P`
-   - Run: `ESP-IDF: Monitor Device`
-   - Or press `Ctrl+E` then `M`
+For issues related to:
+- **Building**: See [SETUP.md](SETUP.md) troubleshooting
+- **Deployment**: See [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting
+- **Touch protocol**: Review `parse_touch()` in [main/app_main.c](main/app_main.c)
+- **HID descriptor**: Review [main/hid_touch.c](main/hid_touch.c)
 
-3. **Flash and Monitor** (combined)
-   - Press `F1` or `Ctrl+Shift+P`
-   - Run: `ESP-IDF: Build, Flash and Monitor`
-   - Or use the flame button in the status bar
-
-## Troubleshooting
-
-- If IntelliSense doesn't work, rebuild the project to regenerate `compile_commands.json`
-- If configuration changes don't take effect, do a full clean and rebuild
-- Make sure the correct USB port is selected in ESP-IDF extension settings
+## Additional Resources
+- **ESP-IDF Extension for VS Code**: [https://docs.espressif.com/projects/vscode-esp-idf-extension/en/latest/](https://docs.espressif.com/projects/vscode-esp-idf-extension/en/latest/)
+- **Getting Started with ESP32-S3**: [https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html)
+- **ESP32-S3-DevKitC-1 v1.1 Board**: [https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html)
+- **Official ESP-IDF Github Repo**: [https://github.com/espressif/esp-idf](https://github.com/espressif/esp-idf)
 
 
+## License
+
+Copyright (C) 2026 Intel Corporation  
+SPDX-License-Identifier: Apache-2.0
