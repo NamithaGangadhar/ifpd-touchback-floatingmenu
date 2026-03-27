@@ -1,0 +1,93 @@
+﻿<!--
+/******************************************************************************
+* Copyright (C) 2026 Intel Corporation
+* SPDX-License-Identifier: Apache-2.0
+*******************************************************************************/
+-->
+
+<Window x:Class="FloatingMenu.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:FloatingMenu"
+        xmlns:Controls="clr-namespace:FloatingMenu.Controls"
+        mc:Ignorable="d"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"    
+        ShowInTaskbar="False"
+        Topmost="True"
+        Title="MainWindow" Height="120" Width="40">
+    <Window.Resources>
+
+        <Storyboard x:Key="SlideInStoryboard">
+            <DoubleAnimation
+        Storyboard.TargetName="FlyoutContainer"
+        Storyboard.TargetProperty="Width"
+        From="0"
+        To="400"
+        Duration="0:0:0.25"/>
+        </Storyboard>
+
+        <Storyboard x:Key="SlideOutStoryboard">
+            <DoubleAnimation
+        Storyboard.TargetName="FlyoutContainer"
+        Storyboard.TargetProperty="Width"
+        From="400"
+        To="0"
+        Duration="0:0:0.25"/>
+        </Storyboard>
+
+        <Storyboard x:Key="WindowExpandStoryboard">
+            <DoubleAnimation
+        Storyboard.TargetProperty="Width"
+        To="500"
+        Duration="0:0:0.25"/>
+        </Storyboard>
+
+        <Storyboard x:Key="WindowCollapseStoryboard">
+            <DoubleAnimation
+        Storyboard.TargetProperty="Width"
+        To="100"
+        Duration="0:0:0.25"/>
+        </Storyboard>
+
+    </Window.Resources>
+    <Grid HorizontalAlignment="Right">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <!-- Edge Menu -->
+            <ColumnDefinition Width="Auto"/>
+            <!-- Flyout Panel -->
+        </Grid.ColumnDefinitions>
+
+        <!-- Overlay Menu -->
+        <Controls:EdgeMenuControl x:Name="EdgeMenu" 
+                                  Margin="0,0,15,0"
+                                  
+                                  Grid.Column="1"
+                                 
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed"/>
+
+        <Controls:EdgeHandleControl 
+                                    Margin="0,0,10,0"
+                                    x:Name="EdgeHandle"/>
+
+        <!-- Flyout Panel -->
+        <Border x:Name="FlyoutContainer"
+                Grid.Column="0"
+                Width="Auto"
+                Background="Transparent"
+                Height="Auto"
+                Visibility="Collapsed">
+
+            <Frame x:Name="FlyoutFrame"
+                   Height="Auto"
+                   Width="Auto"
+                   NavigationUIVisibility="Hidden"/>
+        </Border>
+    </Grid>
+</Window>
