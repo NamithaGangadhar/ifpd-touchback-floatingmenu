@@ -38,9 +38,6 @@ Touch Screen (HID) → Raw Input API → Touch Decoder → Serial Queue → Seri
 ├── Program.cs              # Main application and HID processing 
 ├── Helpers/ 
 │   └── WindowProcess.cs    # Window and process detection utilities 
-├── Properties/ 
-│   └── PublishProfile
-│       └── FolderProfile.pubxml  # Publish profile for deployment
 └── bin/ 
 	└── Release/ 
 		└── net10.0/        # Build output
@@ -115,7 +112,34 @@ Touch Screen (HID) → Raw Input API → Touch Decoder → Serial Queue → Seri
 		```
 		dotnet build -c Release
 		```
-3. **Run the Application**
+
+3. **Install Serial Drivers** (if using USB-to-Serial adapter)
+
+	- Download the appropriate driver for your serial device:
+		- **CH340/CH341**: [Download from manufacturer](http://www.wch-ic.com/downloads/CH341SER_EXE.html)
+		- **FTDI**: [Download from FTDI](https://ftdichip.com/drivers/vcp-drivers/)
+		- **CP210x**: [Download from Silicon Labs](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
+	
+	- Install the downloaded driver:
+		1. Run the driver installer as Administrator
+		2. Follow the installation wizard
+		3. Restart your computer if prompted
+	
+	- Verify driver installation in Device Manager:
+		```powershell
+		devmgmt.msc
+		```
+		1. Expand **Ports (COM & LPT)**
+		2. Look for your device (e.g., "USB-SERIAL CH340 (COM3)")
+		3. Note the COM port number (e.g., COM3, COM10)
+		4. If you see a yellow warning icon, right-click and select **Update driver**
+	
+	- Alternative: List COM ports using PowerShell
+		```powershell
+		Get-WmiObject Win32_SerialPort | Select-Object Name,DeviceID
+		```
+
+4. **Run the Application**
 
 	* Navigate to build output
 		```
@@ -125,7 +149,7 @@ Touch Screen (HID) → Raw Input API → Touch Decoder → Serial Queue → Seri
 		```
 		.\TouchDataCaptureService.exe
 		```
-	* Or with custom settings
+	* Or with custom settings (replace COM3 with your actual COM port)
 		```
 		.\TouchDataCaptureService.exe --port COM3 --baudrate 115200
 		```
@@ -156,8 +180,6 @@ TouchDataCaptureService.exe [options]
 | `--baudrate <value>` | Set baud rate (long form) | 3000000 | `--baudrate 115200` |
 | `-useraw` | Send raw HID bytes instead of decoded data | Disabled | `-useraw` |
 | `--useraw` | Send raw HID bytes (long form) | Disabled | `--useraw` |
-| `-enablebypass` | Skip touch events from specific processes | Disabled | `-enablebypass` |
-| `--enablebypass` | Skip touch events (long form) | Disabled | `--enablebypass` |
 | `-seriallog` | Enable serial communication logging | Disabled | `-seriallog` |
 | `--seriallog` | Enable serial logging (long form) | Disabled | `--seriallog` |
 | `-h` or `--help` | Show help message | N/A | `--help` |
@@ -176,9 +198,9 @@ TouchDataCaptureService.exe [options]
 	```
 	TouchDataCaptureService.exe --port COM3 --baudrate 115200 --seriallog
 	```
-* Raw data mode with bypass enabled
+* Raw data mode
 	```
-	TouchDataCaptureService.exe --port COM4 --useraw --enablebypass
+	TouchDataCaptureService.exe --port COM4 --useraw
 	```
 * View help
 	```
@@ -196,7 +218,7 @@ TouchDataCaptureService.exe [options]
 - **Stop Bits**:       `One`  
 - **Handshake**:       `None`   
 - **Log Mode**:        `RawAndDecoded`   
-- **Process Bypass**:  `Disabled`  
+- **Process Bypass**:  `Always Enabled`  
 - **Serial Logging**:  `Disabled`  
 
 ### Log Modes
@@ -211,6 +233,24 @@ To change the log mode, modify `CurrentLogMode` in `Program.cs`:
 ```
 private static readonly LogMode CurrentLogMode = LogMode.RawAndDecoded;
 ```
+
+### Serial Configuration Notes
+
+> **⚠️ Important: Baud Rate Limitations**
+> 
+> - **Maximum baud rate**: 3000000 (3 Mbps)
+> - **Synchronization requirement**: The baud rate configured in this service **must match exactly** with the baud rate configured in the MCU project (e.g., ESP32).
+> - Exceeding 3 Mbps may cause data corruption or communication failures.
+> - Common stable rates: 9600, 115200, 921600, 3000000
+
+### Data Format Configuration
+
+> **📌 Note: Raw vs Decoded Data Mode**
+> 
+> - **Default mode**: Decoded data (CSV format)
+> - **Current MCU project configuration**: Configured to receive and parse **decoded data**
+> - **To use raw data mode** (`--useraw` flag): The MCU project firmware must be updated to parse raw HID byte format instead of CSV format
+> - Ensure both the service and MCU firmware are synchronized on the data format being used
 
 ## 📊 Touch Data Format
 
@@ -316,7 +356,8 @@ All log files are created in the application directory:
 
 #### Serial Log Format (when enabled)
 ```
-09:15:23.456 TX: TOUCH,16384,8192,0,1,0,1,1,0,0,0,0,0,1 09:15:23.457 RX: OK
+09:15:23.456 TX: TOUCH,16384,8192,0,1,0,1,1,0,0,0,0,0,1 09:15:23.457 
+RX: OK
 ```
 
 ### Log Headers
@@ -338,7 +379,7 @@ Timestamp [Type] Device ReportID ContactCount X Y ContactID TipSwitch [...]
 
 ### Purpose
 
-When enabled with `--enablebypass`, the service can skip touch events originating from specific applications, preventing interference with UI overlays.
+The service automatically skips touch events originating from specific applications, preventing interference with UI overlays. This feature is **always enabled** by default.
 
 ### Bypassed Processes (Default)
 
@@ -351,17 +392,6 @@ When enabled with `--enablebypass`, the service can skip touch events originatin
 2. **Coordinate Conversion** - Converts HID coordinates to screen coordinates
 3. **Process Detection** - Identifies which process owns the window at that location
 4. **Filtering** - Skips logging and serial transmission if process is in bypass list
-
-### Usage
-
-* Enable bypass feature
-	```
-	TouchDataCaptureService.exe --enablebypass
-	```
-* Combine with other options
-	```
-	TouchDataCaptureService.exe --port COM3 --enablebypass --seriallog
-	```
 
 ## 🔧 Troubleshooting
 
@@ -408,7 +438,7 @@ Start-Process TouchDataCaptureService.exe -Verb RunAs
 1. **Reset scaling** - Press 'R' key
 2. **Calibrate** - Touch all four corners systematically
 3. **Wait for samples** - Allow 10+ touches before expecting accurate scaling
-4. **Check logs** - Review scaling information in `hid_decoded.log`
+4. **Check console output** - Review scaling information in the console when running in Debug mode
 
 ### 4. Serial Communication Problems
 
@@ -422,7 +452,9 @@ TouchDataCaptureService.exe --port COM3 --seriallog
 ```
 2. **Check serial log**
 3. **Verify baud rate** matches receiver device
-	Try common baud rates
+> **⚠️ Important:** The baud rate must be identical in both this service and the MCU project. Maximum supported rate is 3000000 bps.
+	
+Try common baud rates
 	```
 	TouchDataCaptureService.exe --port COM3 --baudrate 115200 TouchDataCaptureService.exe --port COM3 --baudrate 9600
 	```
@@ -441,11 +473,7 @@ Remove --seriallog flag
 ```
 TouchDataCaptureService.exe --port COM10
 ```
-2. **Use raw data mode** (less processing)
-```
-TouchDataCaptureService.exe --port COM10 --useraw
-```
-3. **Check queue backlog** in logs
+2. **Check queue backlog** in logs
 ```
 Select-String -Path hid_decoded.log -Pattern "queue full"
 ```

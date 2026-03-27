@@ -20,7 +20,7 @@ This guide covers building, publishing, and deploying the Touch Data Capture Ser
 - **Windows 11** with latest updates
 - **.NET 10 SDK** installed
 - **Git** for source control
-- **Visual Studio 2022** or **VS Code** (optional)
+- **Visual Studio 2022 or higher** or **VS Code** (optional)
 
 ### Target Machine
 
@@ -220,12 +220,12 @@ If you published as framework-dependent, install .NET 10 runtime:
 ### Step 5: Verify Installation
 
 Navigate to install directory
-```
+```powershell
 cd "C:\Program Files\TouchDataCaptureService"
 ```
 
 Test run (show help)
-```
+```powershell
 .\TouchDataCaptureService.exe --help
 ```
 
@@ -270,16 +270,19 @@ Verify:
 		```
 3. **Verify data** is being captured and logged
 
-### Test 4: Process Bypass (Optional)
+### Test 4: Process Bypass
 
-Test bypass feature
+The process bypass feature is always enabled automatically.
+
+Run the service
 ```
-.\TouchDataCaptureService.exe --enablebypass
+.\TouchDataCaptureService.exe
 ```
 
 Verify:
-- Touch events from bypassed apps are skipped
-- Other touch events still captured
+- Touch events from bypassed applications (FloatingMenu, ScreenPaint) are automatically filtered
+- Touch events from other applications are still captured
+- Check `hid_detailed.log` to see process names being logged
 
 ## 🎯 Startup Configuration
 
@@ -325,8 +328,7 @@ REM Configuration Settings (with defaults)
 REM ============================================================================
 set COM_PORT=%~1
 set BAUD_RATE=%~2
-set ENABLE_BYPASS=%~3
-set ENABLE_SERIAL_LOG=%~4
+set ENABLE_SERIAL_LOG=%~3
 
 REM Apply defaults if not provided
 if "%COM_PORT%"=="" set COM_PORT=COM10
@@ -337,12 +339,7 @@ REM Build Command Line
 REM ============================================================================
 set CMD=TouchDataCaptureService.exe --port %COM_PORT% --baudrate %BAUD_RATE%
 
-if /i "%ENABLE_BYPASS%"=="true" (
-    set CMD=%CMD% --enablebypass
-    echo Bypass mode: ENABLED
-) else (
-    echo Bypass mode: DISABLED
-)
+echo Process Bypass: ALWAYS ENABLED (automatic)
 
 if /i "%ENABLE_SERIAL_LOG%"=="true" (
     set CMD=%CMD% --seriallog
@@ -395,14 +392,12 @@ Save as `StartTouchService.bat` in the installation directory.
    ```
    StartTouchService.bat COM12 115200
    ```
-4. Enable bypass:
+4. Enable serial logging:
    ```
    StartTouchService.bat COM3 115200 true
    ```
-5. Enable bypass and serial logging:
-   ```
-   StartTouchService.bat COM3 115200 true true
-   ```
+
+> **Note:** Process bypass is always enabled automatically. There is no need to specify it as a parameter.
 
 ## 🔄 Updates and Maintenance
 
@@ -492,7 +487,7 @@ Use this checklist for each deployment:
 - [ ] Serial port opens successfully
 - [ ] Touch events captured in logs
 - [ ] Data transmitted via serial
-- [ ] Process bypass working (if enabled)
+- [ ] Process bypass working
 - [ ] Coordinate scaling functioning
 - [ ] No errors in log files
 
