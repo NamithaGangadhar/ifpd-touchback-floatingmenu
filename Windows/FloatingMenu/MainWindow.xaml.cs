@@ -267,7 +267,7 @@ namespace FloatingMenu
                     _signalSourcePage.ResetOperationState();
                 }
 
-                KillTouchDataCapture();
+                System.Threading.Tasks.Task.Run(() => KillTouchDataCapture());
 
                 MessageBox.Show(
                     this,
