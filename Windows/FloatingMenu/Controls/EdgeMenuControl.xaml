@@ -32,7 +32,6 @@
                      HorizontalAlignment="Left"
                      VerticalAlignment="Center"
                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                     SelectionChanged="NavList_SelectionChanged"
                      ItemContainerStyle="{StaticResource NavIconItemStyle}">
 
                 <!-- Back -->

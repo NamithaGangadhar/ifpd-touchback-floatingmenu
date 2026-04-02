@@ -399,31 +399,63 @@ namespace FloatingMenu
         {
             try
             {
-                string exePath = Helpers.ReadJSON.GetAnnotationAppPath();
+                //string exePath = Helpers.ReadJSON.GetAnnotationAppPath();
 
-                if (exePath == null)
+                string exePath = System.IO.Path.Combine(
+                 AppDomain.CurrentDomain.BaseDirectory,
+                 "ppInk_Extracted",
+                 "ppInk",
+                 "ppInk.exe");
+
+                if (!System.IO.File.Exists(exePath))
                 {
                     MessageBox.Show(
-                        "Annotation app is not configured.\n\n" +
-                        "To enable this feature, add the full path to your annotation app executable in config.json:\n\n" +
-                        "\"AnnotationAppPath\": \"C:\\\\path\\\\to\\\\your\\\\app.exe\"",
-                        "Configuration Required",
+                        "ppInk annotation tool is not available.\n\n" +
+                        "This application requires ppInk.exe, which is automatically downloaded during the build process.\n\n" +
+                        "Please rebuild the project to ensure ppInk is downloaded correctly. " +
+                        "If the issue persists, verify your internet connection and build configuration.",
+                        "ppInk Not Found",
                         MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                        MessageBoxImage.Warning);
                     return;
                 }
 
-                //string exePath = System.IO.Path.Combine(
-                //    AppDomain.CurrentDomain.BaseDirectory,
-                //    "ppInk",
-                //    "ppInk.exe");
+                if (_annotationProcess != null)
+                {
+                    try
+                    {
+                        if (!_annotationProcess.HasExited)
+                        {
+                            _annotationProcess.CloseMainWindow();
+
+                            if (!_annotationProcess.WaitForExit(20))
+                            {
+                                // Force kill if still running
+                                _annotationProcess.Kill();
+                            }
+
+                            _annotationProcess = null;
+
+                            EdgeMenu.ClearSelection();
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        _annotationProcess = null;
+                    }
+                }
 
                 _annotationProcess = new Process();
                 _annotationProcess.StartInfo.FileName = exePath;
+                _annotationProcess.StartInfo.WorkingDirectory = System.IO.Path.GetDirectoryName(exePath);
+                _annotationProcess.StartInfo.UseShellExecute = true;
+
                 _annotationProcess.EnableRaisingEvents = true;
                 _annotationProcess.Exited += AnnotationProcess_Exited;
 
                 _annotationProcess.Start();
+                EdgeMenu.SelectMenuItem(3);
                 CollapseMenu(false);
             }
             catch (Exception ex)

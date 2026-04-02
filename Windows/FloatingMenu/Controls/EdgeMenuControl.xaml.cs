@@ -24,6 +24,31 @@ namespace FloatingMenu.Controls
         {
             InitializeComponent();
             Loaded += EdgeMenuControl_Loaded;
+            NavList.PreviewMouseLeftButtonDown += NavList_PreviewMouseLeftButtonDown;
+        }
+
+        private void NavList_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var item = FindVisualParent<ListBoxItem>((DependencyObject)e.OriginalSource);
+            if (item != null)
+            {
+                int index = NavList.ItemContainerGenerator.IndexFromContainer(item);
+                if (index >= 0)
+                {
+                    MenuItemSelected?.Invoke(index);
+                }
+            }
+        }
+
+        private T? FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T parent)
+                    return parent;
+                child = VisualTreeHelper.GetParent(child);
+            }
+            return null;
         }
 
         private void EdgeMenuControl_Loaded(object sender, RoutedEventArgs e)
@@ -46,18 +71,6 @@ namespace FloatingMenu.Controls
 
             // Menu width = 4% of screen width
             this.Width = screenWidth * 0.033;
-        }
-
-        private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressSelectionEvent)
-                return;
-
-            if (NavList.SelectedIndex < 0)
-                return;
-
-            // Fire event to MainWindow
-            MenuItemSelected?.Invoke(NavList.SelectedIndex);
         }
 
         public void ClearSelection()
