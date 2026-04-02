@@ -468,7 +468,7 @@ namespace TouchDataCaptureService
         private static bool _detailedHeaderWritten = false;
         private static bool _serialHeaderWritten = false;
 
-        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "FloatingMenu", "ScreenPaint" };
+        private static List<string> SkipProcesses = new() { "InteractiveDisplayCapture", "FloatingMenu", "ScreenPaint", "ppInk" };
         private static readonly Dictionary<IntPtr, Dictionary<string, (int min, int max)>> deviceLogicalRanges = new();
 
         private static void ProcessCommandLineArgs(string[] args)
