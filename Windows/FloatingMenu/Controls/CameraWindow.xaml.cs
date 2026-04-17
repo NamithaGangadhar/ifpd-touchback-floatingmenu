@@ -17,7 +17,9 @@ namespace FloatingMenu.Controls
     /// </summary>
     public partial class CameraWindow : System.Windows.Window
     {
-        
+        // Aspect ratio tolerance for resolution matching (e.g., 16:9 vs 16:10)
+        private const double AspectRatioTolerance = 0.15;
+        const double Epsilon = 1e-6;
         public event Action CameraClosed;
 
         private VideoCaptureDevice _videoSource;
@@ -73,7 +75,7 @@ namespace FloatingMenu.Controls
                 System.Diagnostics.Debug.WriteLine($"Screen: {screenWidth}x{screenHeight} (aspect: {screenAspectRatio:F2})");
 
                 // Select best resolution that matches screen characteristics:
-                // 1. Match screen aspect ratio (±0.15 tolerance for slight variations)
+                // 1. Match screen aspect ratio (±AspectRatioTolerance for slight variations)
                 // 2. Prefer resolution closest to screen resolution (balance quality vs bandwidth)
                 // 3. Prefer higher frame rates (30fps+)
                 // 100% adaptive - no hardcoded resolutions
@@ -84,7 +86,7 @@ namespace FloatingMenu.Controls
                         double aspectDiff = Math.Abs(capAspectRatio - screenAspectRatio);
 
                         // Filter out resolutions with very different aspect ratios
-                        if (aspectDiff > 0.15) return -1000;
+                        if (aspectDiff - AspectRatioTolerance > Epsilon) return -1000;
 
                         // Calculate how close this resolution is to screen resolution
                         int widthDiff = Math.Abs(c.FrameSize.Width - screenWidth);
