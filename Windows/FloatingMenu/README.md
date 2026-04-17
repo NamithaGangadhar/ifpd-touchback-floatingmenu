@@ -5,7 +5,7 @@
 [![WPF](https://img.shields.io/badge/WPF-Windows-blue)](https://docs.microsoft.com/en-us/dotnet/desktop/wpf/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../../Apache-2.0.txt)
 
-A Windows WPF application that provides an edge-docked floating menu interface for camera switching, signal source management, and screen annotation integration on interactive flat panel displays (IFPD).
+A Windows WPF application that provides an edge-docked floating menu interface for camera switching, signal source management, and ppInk screen annotation integration on interactive flat panel displays (IFPD).
 
 ## 📋 Table of Contents
 
@@ -26,7 +26,7 @@ A Windows WPF application that provides an edge-docked floating menu interface f
 
 ## 🔍 Overview
 
-The Floating Menu application provides a convenient edge-docked interface for managing camera feeds and signal sources on Windows-based interactive displays. It features a collapsible menu system, real-time camera preview, automatic camera detection via Windows PnP utilities, and integration with screen annotation tools.
+The Floating Menu application provides a convenient edge-docked interface for managing camera feeds and signal sources on Windows-based interactive displays. It features a collapsible menu system, real-time camera preview, automatic camera detection via Windows PnP utilities, and integration with ppInk screen annotation tool (automatically downloaded during build).
 
 ### Architecture
 
@@ -44,7 +44,7 @@ The Floating Menu application provides a convenient edge-docked interface for ma
 │               - Settings                  ↓                     │
 │                                    Full Screen Display          │
 ├─────────────────────────────────────────────────────────────────┤
-│  External Integration: Screen Paint / Annotation Tool           │
+│  External Integration: ppInk Annotation Tool (auto-downloaded)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,6 +72,9 @@ Windows/
 │       └── Release/ 
 │           └── net10.0-windows/ 
 │               ├── FloatingMenu.exe      # Published executable
+│               ├── ppInk_Extracted/      # ppInk annotation tool (auto-downloaded)
+│               │   └── ppInk/
+│               │       └── ppInk.exe
 │               └── ExternalTools/        # External services (auto-copied)
 │                   └── TouchDataCaptureService/
 │                        └──TouchDataCaptureService.exe
@@ -109,9 +112,11 @@ Windows/
 - **Event-Driven Architecture** - Uses `DeviceSelected` and `CameraClosed` events for state management
 
 ### Screen Annotation Integration
-- **External App Launch** - Integrates with ScreenPaint annotation tool
-- **Process Monitoring** - Detects when annotation tool closes
+- **Automatic ppInk Integration** - ppInk downloaded during build, no manual installation
+- **External App Launch** - Integrates with ppInk annotation tool
+- **Process Monitoring** - Detects when ppInk closes
 - **Seamless Workflow** - Menu auto-collapses when launching annotation
+- **Bundled Deployment** - ppInk included with application package
 
 ### User Interface
 - **Responsive Sizing** - Adapts to screen dimensions dynamically
@@ -122,7 +127,7 @@ Windows/
   - Home (Collapse menu)
   - Exit (Close application)
   - Signal Source (Camera selection)
-  - Annotation (Launch screen annotation tool)
+  - Annotation (Toggle ppInk annotation tool - click once to open, click again to close)
   - Settings (Future expansion)
 
 ## 💻 System Requirements
@@ -132,12 +137,12 @@ Windows/
 - **Display**: Interactive flat panel display or standard monitor
 - **Camera**: USB camera(s) compatible with DirectShow (DSHOW)
 - **RAM**: Minimum 4 GB (8 GB recommended for HD camera feeds)
-- **Disk Space**: 200 MB (for application and dependencies)
+- **Disk Space**: 200 MB (for application, dependencies, and ppInk)
 
 ### Software
 - **.NET Runtime**: .NET 10 Runtime or SDK
 - **Camera Drivers**: DirectShow-compatible camera drivers
-- **Optional**: ScreenPaint or compatible annotation software
+- **ppInk**: Automatically included (no separate installation needed)
 
 ### Dependencies
 - **AForge.Video**: Video processing framework for camera capture
@@ -250,12 +255,18 @@ if (++_frameCounter % 2 != 0)
 //     return;
 ```
 
-### Screen Annotation Tool Path
+### ppInk Annotation Tool Path
 
-To configure the annotation tool path, edit `MainWindow.xaml.cs`:
+The ppInk path is automatically configured using relative pathing:
 ```csharp
-string exePath = @"C:\Program Files\WindowsApps\19566Hanakiansoftware.ScreenPaint_1.3.3.0_x64__y1w6xw98tx1ba\DesktopDrawing\ScreenPaint.exe";
+string exePath = System.IO.Path.Combine(
+    AppDomain.CurrentDomain.BaseDirectory,
+    "ppInk_Extracted",
+    "ppInk",
+    "ppInk.exe");
 ```
+
+**No manual configuration needed!** ppInk is automatically downloaded during the build process and bundled with the application.
 
 ## 🖥️ User Interface
 
@@ -287,11 +298,11 @@ string exePath = @"C:\Program Files\WindowsApps\19566Hanakiansoftware.ScreenPain
 
 - **Size**: Larger panel (18% × 45% of screen)
 - **Menu Items**:
-  1. **Home** - Collapse menu
-  2. **Exit** - Close application
-  3. **Signal Source** - Manage cameras
-  4. **Annotation** - Launch ScreenPaint
-  5. **Settings** - Reserved for future use
+1. **Home** - Collapse menu
+2. **Exit** - Close application
+3. **Signal Source** - Manage cameras
+4. **Annotation** - Toggle ppInk annotation tool (open/close)
+5. **Settings** - Reserved for future use
 
 </td>
 <td width="30%" align="center">
@@ -518,38 +529,69 @@ The application extracts camera names from:
 
 ## 🎨 Screen Annotation Integration
 
-### Supported Annotation Tool
+### ppInk Annotation Tool (Automatic Integration)
 
 <div>
     <img src="../../images/FloatingMenu_AnnotationTool.png" alt="Annotation Tool">
 </div>
 
-- **ScreenPaint** by Hanakian software
-- Version: 1.3.3.0 or later
+- **ppInk** - Open-source screen annotation tool
+- Version: 1.9.0 RC1
 - Platform: Windows x64
+- **Automatically downloaded during build** - No manual installation required!
+- Repository: [https://github.com/pubpub-zz/ppInk](https://github.com/pubpub-zz/ppInk)
 
 ### Integration Features
 
-- **Process Launching**: Starts external annotation application
-- **Process Monitoring**: Detects when annotation tool exits
-- **UI Coordination**: Menu auto-collapses when launching
-- **Menu State**: Clears selection when annotation closes
+- **Automatic Download**: ppInk downloaded during build process via MSBuild target
+- **Bundled Deployment**: ppInk included with application (no separate installation)
+- **Toggle Control**: Click once to open ppInk, click again to close it
+- **Process Management**: Starts and stops ppInk annotation application on demand
+- **Process Monitoring**: Tracks ppInk process state and detects when user closes it
+- **UI Coordination**: Menu auto-collapses when launching ppInk
+- **Menu State**: Clears selection when ppInk closes
+- **Relative Pathing**: Automatically locates ppInk relative to application directory
 
 ### Workflow
 
-1. User clicks **Annotation** menu item
-2. Application launches **ScreenPaint.exe**
+**Opening ppInk:**
+1. User clicks **Annotation** menu item (first click)
+2. Application launches **ppInk.exe** from bundled location
 3. Menu **auto-collapses** to minimize interference
-4. User annotates screen using ScreenPaint
-5. User closes ScreenPaint
+4. User annotates screen using ppInk
+
+**Closing ppInk:**
+5. User closes ppInk via:
+   - **Annotation menu item** (click again) - Application terminates ppInk process
+   - **ESC key** or ppInk toolbar exit - User closes ppInk directly
 6. Application **detects exit** and clears menu selection
 
-### Custom Annotation Tool
+### ppInk Path Configuration
 
-To integrate a different annotation tool, modify the `exePath` in `LaunchAnnotationAppAsync` method in `MainWindow.xaml.cs`:
+The application automatically locates ppInk using a relative path:
 ```csharp
-string exePath = @"C:\Path\To\Your\AnnotationTool.exe";
+string exePath = System.IO.Path.Combine(
+    AppDomain.CurrentDomain.BaseDirectory,
+    "ppInk_Extracted",
+    "ppInk",
+    "ppInk.exe");
 ```
+
+### Using Alternative Annotation Tools
+
+To integrate a different annotation tool instead of ppInk:
+
+1. Modify the `exePath` in `LaunchAnnotationAppAsync` method in `MainWindow.xaml.cs`:
+   ```csharp
+   string exePath = @"C:\Path\To\Your\AnnotationTool.exe";
+   ```
+
+2. (Optional) Remove or modify the ppInk download MSBuild target in `FloatingMenu.csproj`:
+   ```xml
+   <Target Name="DownloadAndExtract_ppInk" AfterTargets="Build">
+   ```
+
+3. Rebuild the application
 
 ## 🔌 TouchBack Integration
 
@@ -1080,34 +1122,45 @@ The TouchDataCaptureService validates the configuration on startup:
    - Application calculates position based on screen dimensions
    - Try at native resolution
 
-### 6. Annotation Tool Won't Launch
+### 6. ppInk Annotation Tool Won't Launch
 
-**Problem:** Clicking Annotation menu item does nothing
+**Problem:** Clicking Annotation menu item does nothing or shows error
 
 **Solutions:**
 
-1. **Verify ScreenPaint installed**
+1. **Verify ppInk was downloaded during build**
    ```powershell
-   Get-ChildItem "C:\Program Files\WindowsApps" -Filter "*ScreenPaint*" -Recurse -Directory
+   Test-Path "ppInk_Extracted\ppInk\ppInk.exe"
    ```
 
-2. **Find actual installation path**
+2. **Check build output for ppInk download messages**
+   - Look for "Downloading ppInk..." in build output
+   - Look for "ppInk setup completed successfully."
+
+3. **Rebuild the application**
    ```powershell
-   Get-ChildItem "C:\Program Files\WindowsApps" -Filter "ScreenPaint.exe" -Recurse
+   dotnet clean
+   dotnet build -c Release
+   ```
+   - Ensure internet connection is available for download
+
+4. **Manually verify ppInk location**
+   ```powershell
+   Get-ChildItem -Path . -Filter "ppInk.exe" -Recurse
    ```
 
-3. **Update file path in code**
-   - Edit `MainWindow.xaml.cs`
-   - Update `exePath` variable with correct path
-   - Rebuild application
+5. **Check for antivirus blocking**
+   - Some antivirus software may block the download
+   - Add exception for ppInk.exe
 
-4. **Install ScreenPaint from Microsoft Store**
-   - Search for "ScreenPaint" by Hanakian
+6. **Verify MSBuild target is present**
+   - Check `FloatingMenu.csproj` for `DownloadAndExtract_ppInk` target
+   - Ensure target runs after build
 
-5. **Check file permissions**
-   - Ensure user has execute permission for annotation tool
+7. **Check file permissions**
+   - Ensure user has execute permission for ppInk.exe
 
-6. **Check Event Viewer for errors**
+8. **Check Event Viewer for errors**
    ```powershell
    Event Viewer → Windows Logs → Application
    ```
@@ -1261,7 +1314,7 @@ Licensed under the Apache License, Version 2.0. See [Apache-2.0.txt](../../Apach
 - **WPF Documentation**: [https://docs.microsoft.com/dotnet/desktop/wpf/](https://docs.microsoft.com/dotnet/desktop/wpf/)
 - **AForge.NET Framework**: [http://www.aforgenet.com/framework/](http://www.aforgenet.com/framework/)
 - **AForge.NET Documentation**: [http://www.aforgenet.com/framework/docs/](http://www.aforgenet.com/framework/docs/)
-- **ScreenPaint**: [Microsoft Store](https://www.microsoft.com/store/apps)
+- **ppInk Screen Annotation Tool**: [https://github.com/pubpub-zz/ppInk](https://github.com/pubpub-zz/ppInk)
 
 ## 🏷️ Version Information
 

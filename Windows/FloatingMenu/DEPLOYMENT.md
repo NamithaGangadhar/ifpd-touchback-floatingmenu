@@ -31,8 +31,9 @@ This guide covers building, publishing, and deploying the Floating Menu Applicat
 - **DirectShow-compatible camera** (USB webcam, document camera, etc.)
 - **Display**: Interactive flat panel display or standard monitor
 - **RAM**: Minimum 4 GB (8 GB recommended for HD camera feeds)
-- **Disk Space**: 200 MB (for application and dependencies)
+- **Disk Space**: 200 MB (for application, dependencies, and ppInk)
 - **Camera Access**: Windows Camera privacy settings must allow desktop apps
+- **Internet Connection**: Required for first build to download ppInk (build machine only)
 
 ## 🔨 Building the Application
 
@@ -74,6 +75,11 @@ This guide covers building, publishing, and deploying the Floating Menu Applicat
 	dotnet build -c Release
 	```
  - Build output location: `bin\Release\net10.0-windows\`
+ - During build, ppInk will be automatically downloaded:
+	```
+	Downloading ppInk...
+	ppInk setup completed successfully.
+	```
 
 ### 4. Verify Build
 
@@ -92,6 +98,7 @@ This guide covers building, publishing, and deploying the Floating Menu Applicat
 - AForge*.dll (AForge libraries)
 - FloatingMenu.runtimeconfig.json
 - FloatingMenu.deps.json
+- ppInk_Extracted\ppInk\ppInk.exe (annotation tool)
 - Controls, Helpers, Styles folders (if not embedded)
 
 ## 📦 Publishing Options
@@ -130,7 +137,9 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 ```
 **Note**: `IncludeNativeLibrariesForSelfExtract=true` is important for AForge native libraries.
 
-Output: Single FloatingMenu.exe file
+**Important**: Even with single-file publishing, the `ppInk_Extracted` folder must be deployed alongside FloatingMenu.exe for annotation functionality to work.
+
+Output: FloatingMenu.exe + ppInk_Extracted folder
 
 ### Option 4: Trimmed Deployment
 
@@ -153,7 +162,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=tru
 	$deployPath = "C:\Temp\FloatingMenu_Deployment"
 	New-Item -Path $deployPath -ItemType Directory -Force
 	```
-* Copy all files:
+* Copy all files (including ppInk_Extracted folder):
 	```
 	Copy-Item -Path * -Destination $deployPath -Recurse
 	```
@@ -280,7 +289,7 @@ Test each menu item:
 - ✅ **Home** - Collapses menu to edge handle
 - ✅ **Exit** - Closes application completely
 - ✅ **Signal Source** - Opens camera selection panel
-- ✅ **Annotation** - Launches annotation tool (if installed)
+- ✅ **Annotation** - Toggles ppInk annotation tool (click to open, click again to close)
 - ✅ **Settings** - (Reserved for future use)
 
 ### Test 5: Multi-Monitor Setup (if applicable)
@@ -401,50 +410,91 @@ Save as `LaunchFloatingMenu.bat` in the installation directory.
 
 ## 🎨 Screen Annotation Integration
 
-### Installing ScreenPaint (Recommended Annotation Tool)
+### ppInk Annotation Tool (Automatic Integration)
 
-**Method 1: Microsoft Store**
+The Floating Menu Application now uses **ppInk** as the integrated screen annotation tool. Unlike ScreenPaint, ppInk is **automatically downloaded and configured during the build process** - no manual installation required!
 
-1. Open **Microsoft Store**
-2. Search for **"ScreenPaint"** by Hanakian Software
-3. Click **Get** or **Install**
-4. Wait for installation to complete
+**Key Features:**
+- ✅ Automatic download during build (no manual installation)
+- ✅ Bundled with the application
+- ✅ Lightweight and open-source
+- ✅ Full screen annotation capabilities
+- ✅ No external dependencies
 
-**Method 2: PowerShell**
+### How ppInk Integration Works
+
+During the build process, an MSBuild target automatically:
+
+1. **Downloads ppInk** from GitHub: `https://github.com/pubpub-zz/ppInk/releases/download/v1.9.0RC1/ppInk.zip`
+2. **Extracts** the archive to the build output directory
+3. **Configures** the path for the application to use
+4. **Skips download** if ppInk.exe already exists (faster subsequent builds)
+
+**Build Output Structure:**
+```
+bin\Release\net10.0-windows\win-x64\publish\
+├── FloatingMenu.exe
+├── ppInk.exe
+├── ppInk_Extracted\
+│   └── ppInk\
+│       └── ppInk.exe
+└── [other application files]
+```
+
+### ppInk Path Configuration
+
+The application automatically locates ppInk at:
+```csharp
+string exePath = System.IO.Path.Combine(
+    AppDomain.CurrentDomain.BaseDirectory,
+    "ppInk_Extracted",
+    "ppInk",
+    "ppInk.exe");
+```
+
+**No manual configuration needed!** The path is relative to the application directory, ensuring it works regardless of installation location.
+
+### Verifying ppInk Download
+
+After building the project, verify ppInk was downloaded:
 
 ```powershell
-# Install via winget (if available)
-winget install "ScreenPaint"
+# Navigate to build output
+cd bin\Release\net10.0-windows\win-x64\publish
+
+# Check if ppInk.exe exists
+Test-Path .\ppInk_Extracted\ppInk\ppInk.exe
+
+# Should return: True
 ```
 
-### Configuring Annotation Tool Path
+If ppInk is missing:
 
-The default path in the application is:
-```
-C:\Program Files\WindowsApps\19566Hanakiansoftware.ScreenPaint_1.3.3.0_x64__y1w6xw98tx1ba\DesktopDrawing\ScreenPaint.exe
-```
+1. **Rebuild the project:**
+   ```
+   dotnet clean
+   dotnet build -c Release
+   ```
 
-**To find your actual ScreenPaint path:**
+2. **Check internet connection** (required for first download)
 
-```powershell
-# Find ScreenPaint installation
-Get-ChildItem "C:\Program Files\WindowsApps" -Filter "*.ScreenPaint*" -Recurse -Directory
-
-# Or search for the executable
-Get-ChildItem "C:\Program Files\WindowsApps" -Filter "ScreenPaint.exe" -Recurse
-```
-
-**To update the path in the application:**
-
-If you need to use a different annotation tool or ScreenPaint is at a different location, you'll need to rebuild the application with the updated path in `MainWindow.xaml.cs`.
+3. **Verify build output** for download messages:
+   ```
+   Downloading ppInk...
+   ppInk setup completed successfully.
+   ```
 
 ### Using Alternative Annotation Tools
 
 To integrate a different annotation tool:
 
-1. Note the full path to the tool's executable
-2. Update the path in `MainWindow.xaml.cs` (line with `exePath` variable)
-3. Rebuild and republish the application
+1. **Locate the tool's executable path**
+2. **Update the path in `MainWindow.xaml.cs`:**
+   ```csharp
+   string exePath = @"C:\Path\To\Your\AnnotationTool.exe";
+   ```
+3. **Remove or modify the MSBuild target** in the `.csproj` file (optional)
+4. **Rebuild and republish** the application
 
 Example for Epic Pen:
 ```csharp
@@ -455,14 +505,22 @@ string exePath = @"C:\Program Files (x86)\Epic Pen\EpicPen.exe";
 
 1. Launch FloatingMenu
 2. Expand menu
-3. Click **Annotation** menu item
+3. Click **Annotation** menu item (first click)
 4. Verify:
-   - ✅ ScreenPaint (or other tool) launches
+   - ✅ ppInk launches successfully
    - ✅ FloatingMenu collapses automatically
-   - ✅ You can annotate the screen
-5. Close annotation tool
+   - ✅ You can annotate/draw on the screen
+   - ✅ ppInk toolbar appears
+5. Click **Annotation** menu item again (second click)
 6. Verify:
+   - ✅ ppInk closes/terminates
+   - ✅ Annotations clear
    - ✅ FloatingMenu clears selection
+   - ✅ Screen returns to normal state
+7. Alternative: Close ppInk using ESC key or toolbar
+8. Verify:
+   - ✅ Application detects ppInk closed
+   - ✅ Menu selection clears automatically
 
 ## 🔄 Updates and Maintenance
 
@@ -563,6 +621,7 @@ Use this checklist for each deployment:
 
 ### Pre-Deployment
 - [ ] .NET 10 SDK installed on build machine
+- [ ] Internet connection available (for ppInk download)
 - [ ] Source code up to date from repository
 - [ ] All changes committed and pushed
 - [ ] AForge NuGet packages restored
@@ -572,9 +631,12 @@ Use this checklist for each deployment:
 ### Build Process
 - [ ] Dependencies restored successfully
 - [ ] Release build completed without errors
+- [ ] ppInk downloaded successfully during build
+- [ ] ppInk.exe verified in ppInk_Extracted\ppInk\ folder
 - [ ] Publish command executed for target platform
 - [ ] Output files verified in publish directory
 - [ ] AForge libraries included
+- [ ] ppInk_Extracted folder included in package
 - [ ] Deployment package created (folder or ZIP)
 
 ### Target Machine Setup
@@ -584,14 +646,14 @@ Use this checklist for each deployment:
 - [ ] Camera drivers installed and up to date
 - [ ] Windows Camera privacy settings configured
 - [ ] Display resolution noted (for testing)
-- [ ] ScreenPaint or annotation tool installed (optional)
+- [ ] ppInk folder included in deployment package (automatic)
 
 ### Installation
 - [ ] Application files copied to installation directory
 - [ ] Permissions configured (if needed)
 - [ ] Desktop shortcut created (if needed)
 - [ ] Startup configuration set (if needed)
-- [ ] Annotation tool path verified (if using)
+- [ ] ppInk folder present in installation directory (automatic)
 
 ### Testing
 - [ ] Application launches successfully
@@ -604,8 +666,9 @@ Use this checklist for each deployment:
 - [ ] Frame rate is smooth (~60 FPS)
 - [ ] Camera releases when window closes
 - [ ] Multiple cameras can be switched
-- [ ] Annotation tool launches (if installed)
-- [ ] Menu collapses when annotation launches
+- [ ] ppInk annotation tool launches successfully
+- [ ] ppInk allows screen annotation/drawing
+- [ ] Menu collapses when ppInk launches
 - [ ] Exit button closes application cleanly
 - [ ] No errors in Event Viewer
 
@@ -652,7 +715,12 @@ Use this checklist for each deployment:
 
 3. Check disk space and permissions
 
-4. Try without single-file option first
+4. Verify ppInk was downloaded:
+   ```powershell
+   Test-Path .\ppInk_Extracted\ppInk\ppInk.exe
+   ```
+
+5. Try without single-file option first
 
 ### 3. Access Denied / Permission Errors
 
@@ -682,6 +750,7 @@ Use this checklist for each deployment:
 - **AForge.NET Documentation**: [Website](http://www.aforgenet.com/framework/)
 - **DirectShow Documentation**: [Microsoft Docs](https://learn.microsoft.com/windows/win32/directshow/directshow)
 - **Windows Camera Privacy**: [Microsoft Support](https://support.microsoft.com/windows/camera-privacy-settings)
+- **ppInk Screen Annotation Tool**: [GitHub](https://github.com/pubpub-zz/ppInk)
 
 ---
 
