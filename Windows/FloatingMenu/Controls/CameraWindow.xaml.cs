@@ -65,12 +65,14 @@ namespace FloatingMenu.Controls
                     System.Diagnostics.Debug.WriteLine($"  {cap.FrameSize.Width}x{cap.FrameSize.Height} @ {cap.AverageFrameRate}fps (aspect: {aspectRatio:F2})");
                 }
 
-                // Get screen dimensions for resolution matching
-                var screen = System.Windows.Forms.Screen.PrimaryScreen;
-                int screenWidth = screen.Bounds.Width;
-                int screenHeight = screen.Bounds.Height;
+                // Get the current window's screen dimensions for resolution matching
+                // Use WorkingArea to better match maximized borderless WPF sizing (taskbar excluded)
+                var windowHandle = new WindowInteropHelper(this).Handle;
+                var screen = System.Windows.Forms.Screen.FromHandle(windowHandle);
+                int screenWidth = screen.WorkingArea.Width;
+                int screenHeight = screen.WorkingArea.Height;
                 double screenAspectRatio = (double)screenWidth / screenHeight;
-                System.Diagnostics.Debug.WriteLine($"Screen: {screenWidth}x{screenHeight} (aspect: {screenAspectRatio:F2})");
+                System.Diagnostics.Debug.WriteLine($"Screen working area: {screenWidth}x{screenHeight} (aspect: {screenAspectRatio:F2})");
 
                 // Select best resolution that matches screen characteristics:
                 // 1. Match screen aspect ratio (±0.15 tolerance for slight variations)
