@@ -21,7 +21,9 @@ namespace FloatingMenu.Controls
         private const double AspectRatioTolerance = 0.15;
         const double Epsilon = 1e-6;
         public event Action CameraClosed;
-
+        // Frame skipping for performance - skip initial frames for faster startup
+        private const int InitialFramesToSkip = 5;  // Skip first few frames (camera warmup)
+        private const int FrameSkipInterval = 2;     // Then process every 2nd frame
         private VideoCaptureDevice _videoSource;
         private FilterInfoCollection _videoDevices;
         private int _frameCounter = 0;
@@ -76,39 +78,34 @@ namespace FloatingMenu.Controls
                 double screenAspectRatio = (double)screenWidth / screenHeight;
                 System.Diagnostics.Debug.WriteLine($"Screen working area: {screenWidth}x{screenHeight} (aspect: {screenAspectRatio:F2})");
 
+                // Filter by aspect ratio tolerance
+                var matchingCaps = _videoSource.VideoCapabilities
+                    .Where(c =>
+                    {
+                        double capAspectRatio = (double)c.FrameSize.Width / c.FrameSize.Height;
+                        double aspectDiff = Math.Abs(capAspectRatio - screenAspectRatio);
+                        return aspectDiff <= AspectRatioTolerance;
+                    })
+                    .ToList();
+
+                // Fallback if no matching aspect ratio found
+                var candidates = matchingCaps.Any()
+                    ? matchingCaps.AsEnumerable()
+                    : _videoSource.VideoCapabilities.AsEnumerable();
+
+
                 // Select best resolution that matches screen characteristics:
                 // 1. Match screen aspect ratio (±AspectRatioTolerance for slight variations)
                 // 2. Prefer resolution closest to screen resolution (balance quality vs bandwidth)
                 // 3. Prefer higher frame rates (30fps+)
                 // 100% adaptive - no hardcoded resolutions
-                VideoCapabilities best = _videoSource.VideoCapabilities
-                    .OrderByDescending(c => 
+                VideoCapabilities best = candidates
+           
+                    .OrderBy(c =>
                     {
-                        double capAspectRatio = (double)c.FrameSize.Width / c.FrameSize.Height;
-                        double aspectDiff = Math.Abs(capAspectRatio - screenAspectRatio);
-
-                        // Filter out resolutions with very different aspect ratios
-                        if (aspectDiff - AspectRatioTolerance > Epsilon) return -1000;
-
-                        // Calculate how close this resolution is to screen resolution
                         int widthDiff = Math.Abs(c.FrameSize.Width - screenWidth);
                         int heightDiff = Math.Abs(c.FrameSize.Height - screenHeight);
-                        int totalDiff = widthDiff + heightDiff;
-
-                        // Score based on proximity to screen resolution
-                        // Closer = better (prefer not too much higher or lower)
-                        int score = 10000 - totalDiff;
-
-                        // Large bonus for exact screen resolution match
-                        if (c.FrameSize.Width == screenWidth && c.FrameSize.Height == screenHeight)
-                            score += 5000;
-
-                        // Slight preference for slightly higher resolution over lower
-                        // (better to downscale than upscale)
-                        if (c.FrameSize.Width >= screenWidth && c.FrameSize.Height >= screenHeight)
-                            score += 100;
-
-                        return score;
+                        return widthDiff + heightDiff; // closer = better
                     })
                     .ThenByDescending(c => c.AverageFrameRate >= 30 ? c.AverageFrameRate : 0)
                     .ThenByDescending(c => c.FrameSize.Width * c.FrameSize.Height)
@@ -141,8 +138,14 @@ namespace FloatingMenu.Controls
         {
             try
             {
-                
-                if (++_frameCounter % 2 != 0)
+                _frameCounter++;
+
+                // Skip initial frames (camera warm-up period) for faster perceived startup
+                if (_frameCounter <= InitialFramesToSkip)
+                    return;
+
+                // After warm-up, skip every other frame to reduce CPU load
+                if (_frameCounter % FrameSkipInterval != 0)
                     return;
 
                 using (Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone())
@@ -163,16 +166,17 @@ namespace FloatingMenu.Controls
                         }
                         finally
                         {
-                            DeleteObject(hBitmap); 
+                            DeleteObject(hBitmap);
                         }
-                    }));
+                    }), DispatcherPriority.Render);  // Higher priority for smoother rendering
                 }
             }
             catch
             {
-                
+
             }
         }
+
         [System.Runtime.InteropServices.DllImport("gdi32.dll")]
         public static extern bool DeleteObject(IntPtr hObject);
 
